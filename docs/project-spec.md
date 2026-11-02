@@ -10,7 +10,7 @@ This document defines the planned product scope. It does **not** claim that the 
 
 - Use HTML, CSS, plain JavaScript, Bootstrap, Node.js, npm, and Vite.
 - Do not use TypeScript, React, or Vue.
-- Use separate page files/modules and shared components.
+- Use separate HTML page entry files with shared components and a Vite multi-page build.
 - Use Supabase Auth, database, Storage upload/download, an admin role, and RLS.
 - Build at least five responsive screens and at least four related database tables.
 - Keep schema changes in committed SQL migrations.
@@ -31,8 +31,10 @@ This document defines the planned product scope. It does **not** claim that the 
 - Recommended products appear before other products in the catalogue and relevant category while respecting active filters.
 - Display the Bulgarian label `Препоръчан` for recommended products.
 - Recommendation does not change pricing and does not make hidden products visible.
+- Promotions and discounts are not part of the product requirements.
 - Hidden products are not accessible to clients, including through a direct URL.
-- Out-of-stock products remain visible and can be requested. The interface must clearly state that requested delivery is subject to confirmation.
+- Products awaiting restock remain visible and orderable. Keep Add to Order enabled and show: "Доставка след зареждане. Можете да добавите продукта към поръчката си — ще се свържем с вас, за да уточним срока."
+- Requested delivery dates are subject to administrator confirmation.
 
 ### Accounts and access
 
@@ -68,11 +70,12 @@ This document defines the planned product scope. It does **not** claim that the 
 - Status changes are manual in the first version.
 - The administrator has a Today view based on confirmed delivery date.
 - Administrators can create, review, and manage orders.
+- Submitted orders cannot be edited or cancelled directly by clients. Show: "За промяна или отказ се свържете с нас". The administrator records an agreed change or cancellation.
 - On a new website order, notify the administrator by email using a server-side email service. The order must still be saved if sending fails, and the notification failure must be stored for retry.
 
 ### Prices
 
-- All prices include VAT and are administrator-only data. Clients must not receive price fields through the API.
+- Currency is EUR. All prices include VAT and are administrator-only data. Clients must not receive price fields through the API.
 - The administrator enters the retail price. The application calculates:
   - salon sale price = retail price × 0.70
   - reference purchase price = retail price × 0.53
@@ -116,18 +119,15 @@ This document defines the planned product scope. It does **not** claim that the 
 
 The first release excludes online payments, automatic Viber integration, partial deliveries, returns, accounting/invoicing, and automatic daily status changes.
 
-## Open decisions
+## Open implementation detail
 
-The following decisions remain intentionally open and must be agreed before implementation; this specification does not invent an answer for them.
+The following technical workflow remains intentionally open and must be defined during implementation.
 
-1. **Currency** — choose the currency and its display format.
-2. **Shortage fulfilment** — define how shortages are supplied or resolved before an approved order can be delivered.
-3. **Client order changes** — decide whether clients can change or cancel a submitted order, and under which status conditions.
-4. **Navigation architecture** — choose the exact page-navigation architecture.
+- **Shortage fulfilment and reservation** — define how shortages are supplied or resolved before an approved order can be delivered, including the precise reservation and release workflow.
 
 ## Consistency notes
 
-- Ordering an out-of-stock product is compatible with the no-reservation-on-creation rule: it becomes a request. Approval must reserve only available quantity and record the remaining shortage. The open shortage-fulfilment decision determines when it may transition to delivery.
+- Ordering an out-of-stock product is compatible with the no-reservation-on-creation rule: it becomes a request. Approval must reserve only available quantity and record the remaining shortage. The open shortage-fulfilment and reservation detail determines when it may transition to delivery.
 - Client ordering without price visibility is intentional: clients request products and quantities, while all monetary data remains administrator-only. The business must confirm the delivery separately.
 - The same salon client identity can exist before and after account registration. Orders belong to the salon client record so linking an approved account later preserves history.
 - The `DONE` status and `delivered_at` are both required: status expresses the workflow state, while the timestamp provides the reporting date.
