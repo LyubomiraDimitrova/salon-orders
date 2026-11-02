@@ -27,7 +27,10 @@ This document defines the planned product scope. It does **not** claim that the 
 - Every product has a name, description, size, and image.
 - Dyes also have a shade number and shade colour; developers also have a concentration.
 - Initially, every shade-and-size combination is represented as a separate product. A later variant model is out of scope for the first version.
-- Promotional products appear first in their applicable listings.
+- An administrator can mark or unmark a product as recommended.
+- Recommended products appear before other products in the catalogue and relevant category while respecting active filters.
+- Display the Bulgarian label `Препоръчан` for recommended products.
+- Recommendation does not change pricing and does not make hidden products visible.
 - Hidden products are not accessible to clients, including through a direct URL.
 - Out-of-stock products remain visible and can be requested. The interface must clearly state that requested delivery is subject to confirmation.
 
@@ -118,10 +121,9 @@ The first release excludes online payments, automatic Viber integration, partial
 The following decisions remain intentionally open and must be agreed before implementation; this specification does not invent an answer for them.
 
 1. **Currency** — choose the currency and its display format.
-2. **Promotion behaviour** — decide whether promotion is only a listing label or also changes the price.
-3. **Shortage fulfilment** — define how shortages are supplied or resolved before an approved order can be delivered.
-4. **Client order changes** — decide whether clients can change or cancel a submitted order, and under which status conditions.
-5. **Navigation architecture** — choose the exact page-navigation architecture.
+2. **Shortage fulfilment** — define how shortages are supplied or resolved before an approved order can be delivered.
+3. **Client order changes** — decide whether clients can change or cancel a submitted order, and under which status conditions.
+4. **Navigation architecture** — choose the exact page-navigation architecture.
 
 ## Consistency notes
 
