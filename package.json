@@ -1,0 +1,29 @@
+{
+  "name": "salon-orders",
+  "version": "1.0.0",
+  "description": "`salon-orders` is a Bulgarian-language application for managing hair-product catalogs, salon clients, inventory, orders, and sales reports. It is a SoftUni AI course project and is currently in its initial setup phase.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LyubomiraDimitrova/salon-orders.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/LyubomiraDimitrova/salon-orders/issues"
+  },
+  "homepage": "https://github.com/LyubomiraDimitrova/salon-orders#readme",
+  "dependencies": {
+    "@popperjs/core": "^2.11.8",
+    "bootstrap": "^5.3.8"
+  },
+  "devDependencies": {
+    "vite": "^8.3.5"
+  }
+}

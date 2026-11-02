@@ -1,0 +1,80 @@
+:root {
+  --salon-ink: #29233a;
+  --salon-plum: #6c486e;
+  --salon-lilac: #f5eff6;
+  --salon-rose: #e2b9bf;
+}
+
+body {
+  background-color: var(--salon-lilac);
+  color: var(--salon-ink);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.site-header,
+.site-footer {
+  background-color: #fff;
+}
+
+.navbar-brand span,
+.eyebrow {
+  color: var(--salon-plum);
+}
+
+.eyebrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.nav-link {
+  font-weight: 500;
+}
+
+.nav-link.active {
+  color: var(--salon-plum) !important;
+}
+
+.hero-section {
+  background: linear-gradient(115deg, #fbf8fc 0%, #eee1ed 100%);
+}
+
+.hero-card,
+.feature-card {
+  border-radius: 1rem;
+}
+
+.hero-card {
+  background-color: var(--salon-ink);
+  box-shadow: 0 1.5rem 3rem rgb(41 35 58 / 15%);
+  color: #fff;
+}
+
+.hero-card .eyebrow {
+  color: var(--salon-rose);
+}
+
+.hero-card .text-body-secondary {
+  color: rgb(255 255 255 / 75%) !important;
+}
+
+.feature-card {
+  background-color: var(--salon-lilac);
+  border: 1px solid #e7d9e6;
+}
+
+.btn-primary {
+  --bs-btn-bg: var(--salon-plum);
+  --bs-btn-border-color: var(--salon-plum);
+  --bs-btn-hover-bg: #563657;
+  --bs-btn-hover-border-color: #563657;
+  --bs-btn-active-bg: #563657;
+  --bs-btn-active-border-color: #563657;
+}
+
+@media (min-width: 992px) {
+  .py-lg-6 {
+    padding-bottom: 5rem !important;
+    padding-top: 5rem !important;
+  }
+}
