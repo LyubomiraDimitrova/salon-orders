@@ -1,0 +1,15 @@
+# salon-orders project instructions
+
+- This is the `salon-orders` SoftUni AI course project.
+- Use HTML, CSS, plain JavaScript, Bootstrap, Vite, and `npm.cmd` on this Windows setup.
+- Do not use TypeScript, React, or Vue.
+- Use Supabase for the database, Auth, and Storage. Enforce all permissions with Supabase RLS.
+- Build a responsive Bulgarian-language interface with separate page files/modules and shared components.
+- Prioritize admin workflows for products, inventory, salon clients, orders, and sales reports.
+- Public visitors may browse. Only admin-approved registered clients may place orders, and clients may edit their own profiles.
+- Admins may create phone or Viber orders for clients who do not have accounts.
+- Prices are admin-only data and must be protected by the backend, not only hidden in the UI.
+- Save database-schema changes as SQL migrations in the repository.
+- Never commit secrets, real customer data, or confidential price lists.
+- Work in small steps: implement, verify, explain, then commit.
+- Use English identifiers in code and English commit messages.
