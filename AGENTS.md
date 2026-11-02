@@ -13,3 +13,4 @@
 - Never commit secrets, real customer data, or confidential price lists.
 - Work in small steps: implement, verify, explain, then commit.
 - Use English identifiers in code and English commit messages.
+- Project requirements: see [docs/project-spec.md](docs/project-spec.md).

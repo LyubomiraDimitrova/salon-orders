@@ -2,6 +2,8 @@
 
 `salon-orders` is a Bulgarian-language application for managing hair-product catalogs, salon clients, inventory, orders, and sales reports. It is a SoftUni AI course project.
 
+The planned functionality and open product decisions are documented in [docs/project-spec.md](docs/project-spec.md).
+
 ## Requirements
 
 - Node.js 20 or later
