@@ -30,19 +30,21 @@ The design uses English table and field names. Database values for statuses and 
 
 | Table | Main fields | Purpose and relationships |
 | --- | --- | --- |
-| `brands` | `id bigint PK`, `name unique`, `is_hidden`, `sort_order` | A product brand. |
-| `product_categories` | `id bigint PK`, `name`, `product_group`, `sort_order` | Categories such as dyes, developers, masks, and conditioners. `product_group` keeps the first version simple while supporting hair-care subcategories. |
-| `products` | `id bigint PK`, `brand_id FK`, `category_id FK`, `name`, `description`, `size_label`, `product_type`, `shade_number`, `shade_name`, `shade_color`, `developer_concentration`, `image_path`, `is_hidden`, `is_recommended`, `created_at`, `updated_at` | One sellable shade/size combination per row. Dye-only and developer-only fields are nullable where not applicable. `is_recommended` controls the `Препоръчан` label and sorting only; it never changes a price or bypasses `is_hidden`. |
+| `brands` | `id bigint PK`, `name unique`, `is_hidden`, `sort_order` | A product brand. A hidden brand and all its products are excluded from public access. |
+| `product_categories` | `id bigint PK`, `name`, `product_group`, `sort_order` | Categories for dyes, developers, hair-care products (such as masks and conditioners), and technical products. |
+| `products` | `id bigint PK`, `brand_id nullable FK`, `category_id nullable FK`, `article_code nullable unique`, `series_name nullable`, `name`, `description`, `size_label`, `shade_number`, `shade_name`, `shade_color`, `developer_concentration`, `image_path`, `is_hidden`, `is_recommended`, `created_at`, `updated_at` | One sellable shade/size combination per row. `article_code` remains text and is unique when provided; `series_name` is independent of category. `size_label` stays text for bottles, ampoule packs, and kits. `developer_concentration` preserves labels such as `20 VOL`. Hidden drafts require only a name; publishing additionally requires brand, category, a non-blank size/pack description, and a retail price. |
 | `product_prices` | `product_id PK/FK`, `retail_price`, `salon_sale_price`, `reference_purchase_price`, `updated_at`, `updated_by` | Current prices including VAT. This is an administrator-only table in a non-exposed schema, such as `private`. |
 
 `products` deliberately has no price columns. Catalogue queries can expose only visible product metadata and images. Recommended products sort first **after** the active filters are applied, then ordinary product sorting applies.
+
+An administrator creates and edits products and descriptions. Missing inventory data is treated as **not entered**, not as proof that a product is out of stock. An unclear price-list entry is omitted from the first import and completed later by an administrator; neither prices nor stock quantities are invented.
 
 ### Orders and notifications
 
 | Table | Main fields | Purpose and relationships |
 | --- | --- | --- |
 | `orders` | `id bigint PK`, `order_number unique`, `salon_client_id FK`, `placed_by_profile_id nullable FK`, `source`, `status`, requested and confirmed delivery fields, contact/address snapshots, `delivery_instructions`, `customer_note`, `denial_reason`, `delivered_at`, `created_at`, `updated_at` | The order header. `placed_by_profile_id` is populated for website orders and may be null for phone/Viber orders. Snapshots preserve the historical contact/address details. |
-| `order_lines` | `id bigint PK`, `order_id FK`, `product_id FK`, `product_name_snapshot`, `product_size_snapshot`, `quantity`, `created_at` | The products and positive quantities requested. Product snapshots keep the order understandable if a product is later renamed or archived. |
+| `order_lines` | `id bigint PK`, `order_id FK`, `product_id FK`, `product_name_snapshot`, `product_size_snapshot`, `quantity`, `created_at` | The products and positive quantities requested. Product snapshots keep the order readable if a product is later renamed, hidden, or archived. |
 | `order_line_price_snapshots` | `order_line_id PK/FK`, `retail_price`, `salon_sale_price`, `reference_purchase_price`, `currency` | One protected price snapshot for each order line. It is separate from client-readable order lines so clients cannot obtain prices through the public API. |
 | `order_notifications` | `id bigint PK`, `order_id FK`, `channel`, `status`, `attempt_count`, `last_error`, `next_retry_at`, `sent_at` | Records the server-side email notification for a new website order. A failed email does not roll back the order and can be retried. |
 
@@ -54,7 +56,7 @@ The application creates an order with its line snapshots atomically. Clients can
 | --- | --- | --- |
 | `stock_levels` | `product_id PK/FK`, `physical_quantity`, `reserved_quantity`, `updated_at` | One current balance per product. Available quantity is calculated as `physical_quantity - reserved_quantity`; it is not stored separately. Both values are non-negative and reserved quantity cannot exceed physical quantity. |
 | `stock_movements` | `id bigint PK`, `product_id FK`, `movement_type`, `quantity_delta`, `reason`, `order_id nullable FK`, `created_by_profile_id FK`, `created_at` | Immutable audit trail for receipts, adjustments, and delivery deductions. |
-| `stock_reservations` | `id bigint PK`, `order_line_id FK`, `product_id FK`, `quantity`, `status`, `allocated_by_profile_id FK`, `allocated_at`, `released_at`, `consumed_at` | Each row reserves a positive quantity for an order line. Several active rows may be used for a line when it is supplied in stages. Status is `active`, `released`, or `consumed`. |
+| `stock_reservations` | `id bigint PK`, `order_line_id FK`, `product_id FK`, `quantity`, `status`, `allocated_by_profile_id FK`, `allocated_at`, `released_at`, `consumed_at` | Each row reserves a positive quantity for an order line. A composite foreign key to `(order_lines.id, order_lines.product_id)` must ensure that the reservation product matches its order-line product. Several active rows may be used for a line when it is supplied in stages. Status is `active`, `released`, or `consumed`. |
 
 ## Relationship diagram
 
@@ -110,6 +112,8 @@ This separation is necessary because RLS controls rows, not a convenient guarant
 4. The administrator explicitly allocates received units to waiting order lines. The same atomic allocation transaction rechecks availability, increases `reserved_quantity`, and adds an active reservation. It cannot allocate more than the available quantity.
 5. Delivery is allowed only when the total active reservation quantity for **every** order line equals the requested line quantity. Delivery then atomically deducts physical stock, decreases reserved stock, adds delivery movements, and marks those reservations `consumed`.
 6. Denial releases active reservations in one transaction by decreasing `reserved_quantity` and marking the reservations `released`. It does not change physical stock.
+
+For an approved-order edit, the server reconciles old and new reservations in one transaction before persisting the change. Delivery and denial operations must be idempotent: a repeated request sees the already-consumed or already-released reservation state and makes no second stock change.
 
 The database transaction, row locking, constraints, and reservation audit rows—not the user interface—prevent a unit from being allocated twice or availability from becoming negative.
 

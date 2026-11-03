@@ -23,18 +23,24 @@ This document defines the planned product scope. It does **not** claim that the 
 ### Catalogue and products
 
 - Brands contain hair dyes, developers, and hair-care products.
-- Hair-care products support subcategories such as masks and conditioners.
-- Every product has a name, description, size, and image.
+- Product categories support dyes, developers, hair-care products (including masks and conditioners), and technical products.
+- Administrators can create and edit products and their descriptions.
+- Products have names, descriptions, size/pack labels, and images. `size_label` remains text so it can describe bottles, ampoule packs, and kits; hidden drafts may remain incomplete as described below.
+- A product may have an optional text `article_code`, which is unique when provided, and an optional `series_name` that is separate from its category.
 - Dyes also have a shade number and shade colour; developers also have a concentration.
+- Developer concentrations preserve the supplied text label, for example `20 VOL`.
 - Initially, every shade-and-size combination is represented as a separate product. A later variant model is out of scope for the first version.
 - An administrator can mark or unmark a product as recommended.
 - Recommended products appear before other products in the catalogue and relevant category while respecting active filters.
 - Display the Bulgarian label `Препоръчан` for recommended products.
 - Recommendation does not change pricing and does not make hidden products visible.
 - Promotions and discounts are not part of the product requirements.
-- Hidden products are not accessible to clients, including through a direct URL.
+- Hidden brands hide all of their products from public access. Hidden products are likewise inaccessible to clients, including through a direct URL.
+- A hidden product may be saved as an incomplete draft, but it must have a name. Before publishing it, require a brand, category, meaningful size/pack description, and retail price.
 - Products awaiting restock remain visible and orderable. Keep Add to Order enabled and show: "Доставка след зареждане. Можете да добавите продукта към поръчката си — ще се свържем с вас, за да уточним срока."
 - Requested delivery dates are subject to administrator confirmation.
+- Missing stock data means "not entered", not confirmed out of stock. Initial quantities must not be invented.
+- Unclear price-list entries are omitted from the initial import and entered by an administrator later.
 
 ### Accounts and access
 
@@ -55,7 +61,7 @@ This document defines the planned product scope. It does **not** claim that the 
 
 - An order contains one or more products, each with a positive integer quantity.
 - Each order has a unique order number.
-- Store contact and address snapshots on the order so later profile edits do not change historical records.
+- Store contact, address, and product-detail snapshots on the order so later profile/product edits, hiding, or archiving do not change historical records.
 - A client can request a future delivery date, a from/to time interval, optional delivery-time instructions, and an order note.
 - The first version imposes no business-day or opening-hour restrictions.
 - An administrator confirms the delivery date and time after a phone call. Keep both requested and confirmed values.
@@ -88,10 +94,13 @@ This document defines the planned product scope. It does **not** claim that the 
 - Record stock receipts and adjustments with reasons and timestamps.
 - New orders do not reserve stock.
 - On approval, reserve available quantities and track shortages separately.
+- Every reservation must reference the same product as its order line.
 - Physical and available stock must never become negative.
 - Delivery deducts stock and releases the corresponding reservation.
 - Denial releases reservations.
 - Use atomic server-side operations to prevent duplicate deductions and overselling.
+- Changes to approved orders reconcile their reservations atomically before the change is saved.
+- Repeated delivery or denial requests are idempotent: they must not deduct or release stock twice.
 - Preserve products referenced by orders; hide or archive them rather than deleting them.
 
 ### Analytics
