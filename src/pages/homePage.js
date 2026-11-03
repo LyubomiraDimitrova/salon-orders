@@ -49,5 +49,9 @@ export function createHomePage() {
     </section>
   `;
 
+  const catalogButton = main.querySelector('.btn-primary');
+  catalogButton.href = 'catalog.html';
+  catalogButton.textContent = 'Разгледайте колекцията';
+
   return main;
 }

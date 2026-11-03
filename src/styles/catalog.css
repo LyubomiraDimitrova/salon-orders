@@ -1,0 +1,80 @@
+.catalog-page {
+  min-height: 70vh;
+}
+
+.catalog-filters {
+  background-color: #fff;
+  border: 1px solid #e7d9e6;
+  border-radius: 1rem;
+  box-shadow: 0 0.75rem 1.75rem rgb(41 35 58 / 6%);
+  padding: 1.25rem;
+}
+
+.catalog-summary {
+  color: var(--salon-plum);
+  font-weight: 600;
+}
+
+.catalog-product-card {
+  background-color: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 0.75rem 1.75rem rgb(41 35 58 / 8%);
+  overflow: hidden;
+}
+
+.catalog-product-media {
+  align-items: center;
+  background-color: #eee1ed;
+  display: flex;
+  height: 13rem;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.catalog-product-image {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.catalog-image-placeholder {
+  align-items: center;
+  color: var(--salon-plum);
+  display: flex;
+  font-size: 0.875rem;
+  font-weight: 600;
+  height: 100%;
+  justify-content: center;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  width: 100%;
+}
+
+.catalog-recommended-badge {
+  background-color: var(--salon-plum);
+  color: #fff;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  padding: 0.45rem 0.65rem;
+}
+
+.catalog-detail {
+  color: #5f596b;
+  font-size: 0.95rem;
+}
+
+.catalog-detail strong {
+  color: var(--salon-ink);
+}
+
+.catalog-state {
+  background-color: #fff;
+  border: 1px dashed #cbb7ca;
+  border-radius: 1rem;
+}
+
+@media (max-width: 575.98px) {
+  .catalog-filters {
+    padding: 1rem;
+  }
+}

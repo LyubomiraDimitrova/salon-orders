@@ -6,6 +6,11 @@
 - Use Supabase for the database, Auth, and Storage. Enforce all permissions with Supabase RLS.
 - Build a responsive Bulgarian-language interface with separate page files/modules and shared components.
 - Prioritize admin workflows for products, inventory, salon clients, orders, and sales reports.
+- The administrator primarily uses a phone for all workflows, including analytics and sales reports.
+- Prioritize touch-friendly controls, concise forms, and minimal horizontal scrolling.
+- Design reports with readable summary cards, mobile-friendly charts, simple date filters, and expandable details.
+- Do not rely on hover interactions or wide tables as the only way to access information.
+- Keep desktop support for maintenance and administration.
 - Public visitors may browse. Only admin-approved registered clients may place orders, and clients may edit their own profiles.
 - Admins may create phone or Viber orders for clients who do not have accounts.
 - Prices are admin-only data and must be protected by the backend, not only hidden in the UI.

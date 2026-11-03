@@ -1,4 +1,6 @@
-export function createHeader() {
+export function createHeader({ currentPage = 'home' } = {}) {
+  const isHomePage = currentPage === 'home';
+  const isCatalogPage = currentPage === 'catalog';
   const header = document.createElement('header');
   header.className = 'site-header border-bottom';
   header.innerHTML = `
@@ -28,6 +30,22 @@ export function createHeader() {
       </div>
     </nav>
   `;
+
+  const [homeLink, catalogPlaceholder] = header.querySelectorAll('.nav-item .nav-link');
+  const brandLink = header.querySelector('.navbar-brand');
+  const catalogLink = document.createElement('a');
+
+  brandLink.href = 'index.html';
+  homeLink.href = 'index.html';
+  homeLink.textContent = 'Начало';
+  homeLink.classList.toggle('active', isHomePage);
+  homeLink.toggleAttribute('aria-current', isHomePage);
+
+  catalogLink.className = `nav-link${isCatalogPage ? ' active' : ''}`;
+  catalogLink.href = 'catalog.html';
+  catalogLink.textContent = 'Каталог';
+  catalogLink.toggleAttribute('aria-current', isCatalogPage);
+  catalogPlaceholder.replaceWith(catalogLink);
 
   return header;
 }

@@ -18,6 +18,14 @@ This document defines the planned product scope. It does **not** claim that the 
 - Include repository documentation and a database relationship diagram.
 - Meet the course-history target of at least 15 meaningful commits made across at least three different days.
 
+## Mobile-first administration
+
+- The administrator primarily uses a phone for every workflow, including analytics and sales reports.
+- Use touch-friendly controls, concise forms, and layouts that avoid unnecessary horizontal scrolling.
+- Reports must provide readable summary cards, mobile-friendly charts, simple date filters, and expandable details.
+- Hover interactions and wide tables must never be the only way to reach information or actions.
+- Desktop remains supported for maintenance and administration.
+
 ## Functional scope
 
 ### Catalogue and products
