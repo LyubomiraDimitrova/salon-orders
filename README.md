@@ -18,6 +18,28 @@ npm.cmd run dev
 
 Vite will print a local address, usually `http://localhost:5173`.
 
+## Supabase local configuration
+
+1. Copy `.env.example` to a new local-only file named `.env.local`.
+2. In the Supabase Dashboard, open the project and select **Connect**. Copy the
+   **Project URL** and the **publishable key** shown for JavaScript clients.
+   The same values are also available in **Project Settings > API Keys**.
+3. Set the following values in `.env.local`, then restart Vite:
+
+   ```dotenv
+   VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+   VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+   ```
+
+`.env.local` is ignored by Git. The publishable key is intended for browser
+clients and remains constrained by Supabase Row Level Security. Never place a
+secret/service-role key or a database password in a Vite environment variable
+or frontend source file.
+
+If these variables are absent or the URL is invalid, the home page still loads
+and shows a configuration notice. No authentication or data access is started
+until a later feature uses the shared client.
+
 ## Available commands
 
 - `npm.cmd run dev` — starts the development server.

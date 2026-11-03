@@ -21,6 +21,7 @@
   "homepage": "https://github.com/LyubomiraDimitrova/salon-orders#readme",
   "dependencies": {
     "@popperjs/core": "^2.11.8",
+    "@supabase/supabase-js": "^2.118.0",
     "bootstrap": "^5.3.8"
   },
   "devDependencies": {
