@@ -1,42 +1,94 @@
 :root {
-  --salon-ink: #29233a;
-  --salon-plum: #6c486e;
-  --salon-lilac: #f5eff6;
-  --salon-rose: #e2b9bf;
+  --salon-font-family: 'Manrope', Arial, Helvetica, sans-serif;
+  --salon-ink: #233e43;
+  --salon-page-background: #f7f3df;
+  --salon-soft-accent: #dde59a;
+  --salon-secondary-accent: #a6ccd5;
+  --salon-primary: #285d68;
+  --salon-primary-hover: #1d4b55;
+  --salon-primary-rgb: 40 93 104;
+  --salon-rose: #c7838a;
+  --salon-border: #c9d9b1;
+  --salon-surface: #fffef8;
+  --salon-surface-rgb: 255 254 248;
+  --salon-muted-ink: #48656a;
+  --salon-focus-ring: rgb(var(--salon-primary-rgb) / 55%);
 }
 
 body {
-  background-color: var(--salon-lilac);
+  background-color: var(--salon-page-background);
   color: var(--salon-ink);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--salon-font-family);
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.display-4.fw-bold,
+.display-5.fw-bold,
+.navbar-brand.fw-bold {
+  font-weight: 600 !important;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: 1rem !important;
+  line-height: 1.5;
+}
+
+.btn {
+  font-weight: 600;
+  line-height: 1.5;
 }
 
 .site-header,
 .site-footer {
-  background-color: #fff;
+  background-color: var(--salon-surface);
+}
+
+.site-header {
+  border-color: var(--salon-border) !important;
 }
 
 .navbar-brand span,
 .eyebrow {
-  color: var(--salon-plum);
+  color: var(--salon-primary);
 }
 
 .eyebrow {
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.14em;
 }
 
 .nav-link {
+  color: var(--salon-primary);
   font-weight: 500;
 }
 
+.nav-link:hover {
+  color: var(--salon-primary-hover);
+}
+
 .nav-link.active {
-  color: var(--salon-plum) !important;
+  color: var(--salon-primary) !important;
 }
 
 .hero-section {
-  background: linear-gradient(115deg, #fbf8fc 0%, #eee1ed 100%);
+  background: linear-gradient(115deg, var(--salon-page-background) 0%, var(--salon-secondary-accent) 100%);
 }
 
 .hero-card,
@@ -46,30 +98,84 @@ body {
 
 .hero-card {
   background-color: var(--salon-ink);
-  box-shadow: 0 1.5rem 3rem rgb(41 35 58 / 15%);
-  color: #fff;
+  box-shadow: 0 1.5rem 3rem rgb(var(--salon-primary-rgb) / 15%);
+  color: var(--salon-surface);
 }
 
 .hero-card .eyebrow {
-  color: var(--salon-rose);
+  border-left: 0.25rem solid var(--salon-rose);
+  color: var(--salon-surface);
+  padding-left: 0.5rem;
 }
 
 .hero-card .text-body-secondary {
-  color: rgb(255 255 255 / 75%) !important;
+  color: rgb(var(--salon-surface-rgb) / 75%) !important;
 }
 
 .feature-card {
-  background-color: var(--salon-lilac);
-  border: 1px solid #e7d9e6;
+  background-color: var(--salon-soft-accent);
+  border: 1px solid var(--salon-border);
+}
+
+.text-body-secondary {
+  color: var(--salon-muted-ink) !important;
+}
+
+.form-control,
+.form-select {
+  border-color: var(--salon-border);
 }
 
 .btn-primary {
-  --bs-btn-bg: var(--salon-plum);
-  --bs-btn-border-color: var(--salon-plum);
-  --bs-btn-hover-bg: #563657;
-  --bs-btn-hover-border-color: #563657;
-  --bs-btn-active-bg: #563657;
-  --bs-btn-active-border-color: #563657;
+  --bs-btn-bg: var(--salon-primary);
+  --bs-btn-border-color: var(--salon-primary);
+  --bs-btn-color: var(--salon-surface);
+  --bs-btn-hover-bg: var(--salon-primary-hover);
+  --bs-btn-hover-border-color: var(--salon-primary-hover);
+  --bs-btn-hover-color: var(--salon-surface);
+  --bs-btn-active-bg: var(--salon-primary-hover);
+  --bs-btn-active-border-color: var(--salon-primary-hover);
+  --bs-btn-active-color: var(--salon-surface);
+  --bs-btn-focus-shadow-rgb: 40, 93, 104;
+}
+
+.btn-outline-primary {
+  --bs-btn-color: var(--salon-primary);
+  --bs-btn-border-color: var(--salon-primary);
+  --bs-btn-hover-bg: var(--salon-primary);
+  --bs-btn-hover-border-color: var(--salon-primary);
+  --bs-btn-hover-color: var(--salon-surface);
+  --bs-btn-active-bg: var(--salon-primary-hover);
+  --bs-btn-active-border-color: var(--salon-primary-hover);
+  --bs-btn-active-color: var(--salon-surface);
+  --bs-btn-focus-shadow-rgb: 40, 93, 104;
+}
+
+a {
+  color: var(--salon-primary);
+}
+
+a:hover {
+  color: var(--salon-primary-hover);
+}
+
+.btn:focus-visible,
+.form-control:focus,
+.form-select:focus,
+.navbar-toggler:focus-visible,
+.nav-link:focus-visible {
+  outline: 3px solid var(--salon-focus-ring);
+  outline-offset: 0.15rem;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--salon-primary);
+  box-shadow: 0 0 0 0.25rem var(--salon-focus-ring);
+}
+
+.navbar-toggler:focus-visible {
+  box-shadow: 0 0 0 0.25rem var(--salon-focus-ring);
 }
 
 @media (min-width: 992px) {

@@ -66,25 +66,28 @@ function createImage(productName, imagePath) {
 
 function createProductCard(product, brandName, categoryName) {
   const column = createElement('div', 'col');
-  const card = createElement('article', 'card catalog-product-card h-100 border-0');
+  const card = createElement('article', 'card catalog-product-card border-0');
   const media = createElement('div', 'catalog-product-media');
   const body = createElement('div', 'card-body d-flex flex-column p-4');
-  const details = createElement('div', 'mt-auto');
+  const details = createElement('div', 'catalog-details-content');
+  const detailDisclosure = document.createElement('details');
+  const detailsSummary = createElement('summary', 'catalog-details-summary', 'Детайли');
 
   media.append(createImage(product.name, product.image_path));
 
   if (product.is_recommended) {
-    body.append(createElement('span', 'badge catalog-recommended-badge align-self-start mb-3', 'Препоръчан'));
+    media.append(createElement('span', 'badge catalog-recommended-badge', 'Препоръчан'));
   }
 
-  body.append(createElement('h2', 'h5 card-title mb-3', product.name));
+  body.append(createElement('h2', 'h5 card-title catalog-product-title mb-3', product.name));
   addDetail(details, 'Марка', brandName || 'Не е посочена');
   addDetail(details, 'Серия', product.series_name);
   addDetail(details, 'Категория', categoryName || 'Не е посочена');
   addDetail(details, 'Разфасовка', product.size_label);
   addDetail(details, 'Нюанс', [product.shade_number, product.shade_name].filter(Boolean).join(' '));
   addDetail(details, 'Концентрация', product.developer_concentration);
-  body.append(details);
+  detailDisclosure.append(detailsSummary, details);
+  body.append(detailDisclosure);
   card.append(media, body);
   column.append(card);
   return column;
@@ -123,7 +126,7 @@ export function createCatalogPage() {
   const searchInput = document.createElement('input');
   const brandSelect = document.createElement('select');
   const categorySelect = document.createElement('select');
-  const clearButton = createElement('button', 'btn btn-outline-secondary w-100', 'Изчисти филтрите');
+  const clearButton = createElement('button', 'btn btn-outline-primary w-100 catalog-clear-filters', 'Изчисти филтрите');
   const summary = createElement('p', 'catalog-summary mb-4', '');
   const content = createElement('section', 'catalog-content');
 
@@ -140,10 +143,10 @@ export function createCatalogPage() {
   clearButton.disabled = true;
 
   [
-    ['col-12 col-lg-5', createLabel('Търсене', searchInput), searchInput],
+    ['col-12 col-lg-4', createLabel('Търсене', searchInput), searchInput],
     ['col-12 col-md-5 col-lg-3', createLabel('Марка', brandSelect), brandSelect],
     ['col-12 col-md-5 col-lg-3', createLabel('Категория', categorySelect), categorySelect],
-    ['col-12 col-md-2 col-lg-1', createElement('span', 'visually-hidden', 'Филтри'), clearButton],
+    ['col-12 col-lg-2', createElement('span', 'visually-hidden', 'Филтри'), clearButton],
   ].forEach(([columnClass, label, control]) => {
     const field = createElement('div', columnClass);
     field.append(label, control);

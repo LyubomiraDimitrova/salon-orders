@@ -3,32 +3,33 @@
 }
 
 .catalog-filters {
-  background-color: #fff;
-  border: 1px solid #e7d9e6;
+  background-color: var(--salon-surface);
+  border: 1px solid var(--salon-border);
   border-radius: 1rem;
-  box-shadow: 0 0.75rem 1.75rem rgb(41 35 58 / 6%);
+  box-shadow: 0 0.75rem 1.75rem rgb(var(--salon-primary-rgb) / 6%);
   padding: 1.25rem;
 }
 
 .catalog-summary {
-  color: var(--salon-plum);
+  color: var(--salon-primary);
   font-weight: 600;
 }
 
 .catalog-product-card {
-  background-color: #fff;
+  background-color: var(--salon-surface);
   border-radius: 1rem;
-  box-shadow: 0 0.75rem 1.75rem rgb(41 35 58 / 8%);
+  box-shadow: 0 0.75rem 1.75rem rgb(var(--salon-primary-rgb) / 8%);
   overflow: hidden;
 }
 
 .catalog-product-media {
   align-items: center;
-  background-color: #eee1ed;
+  background-color: var(--salon-soft-accent);
   display: flex;
   height: 13rem;
   justify-content: center;
   overflow: hidden;
+  position: relative;
 }
 
 .catalog-product-image {
@@ -39,7 +40,7 @@
 
 .catalog-image-placeholder {
   align-items: center;
-  color: var(--salon-plum);
+  color: var(--salon-primary);
   display: flex;
   font-size: 0.875rem;
   font-weight: 600;
@@ -51,15 +52,23 @@
 }
 
 .catalog-recommended-badge {
-  background-color: var(--salon-plum);
-  color: #fff;
+  background-color: var(--salon-primary);
+  color: var(--salon-surface);
   font-size: 0.75rem;
+  left: 1rem;
   letter-spacing: 0.04em;
   padding: 0.45rem 0.65rem;
+  position: absolute;
+  top: 1rem;
+  z-index: 1;
+}
+
+.catalog-product-title {
+  min-height: 2.5em;
 }
 
 .catalog-detail {
-  color: #5f596b;
+  color: var(--salon-muted-ink);
   font-size: 0.95rem;
 }
 
@@ -67,10 +76,60 @@
   color: var(--salon-ink);
 }
 
+.catalog-product-card details {
+  border-top: 1px solid var(--salon-border);
+  margin-top: 1rem;
+}
+
+.catalog-details-summary {
+  align-items: center;
+  color: var(--salon-primary);
+  cursor: pointer;
+  display: flex;
+  font-weight: 400;
+  list-style: none;
+  min-height: 2.75rem;
+  padding: 0.5rem 0;
+  touch-action: manipulation;
+}
+
+.catalog-details-summary::-webkit-details-marker {
+  display: none;
+}
+
+.catalog-details-summary::after {
+  border-bottom: 1px solid currentcolor;
+  border-right: 1px solid currentcolor;
+  content: '';
+  height: 0.45rem;
+  margin-left: 0.65rem;
+  transform: rotate(45deg) translateY(-0.12rem);
+  transition: transform 150ms ease;
+  width: 0.45rem;
+}
+
+.catalog-product-card details[open] .catalog-details-summary::after {
+  transform: rotate(225deg) translateY(-0.05rem);
+}
+
+.catalog-details-summary:focus-visible {
+  border-radius: 0.25rem;
+  outline: 3px solid var(--salon-focus-ring);
+  outline-offset: 0.15rem;
+}
+
+.catalog-details-content {
+  padding-top: 0.25rem;
+}
+
 .catalog-state {
-  background-color: #fff;
-  border: 1px dashed #cbb7ca;
+  background-color: var(--salon-secondary-accent);
+  border: 1px dashed var(--salon-border);
   border-radius: 1rem;
+}
+
+.catalog-clear-filters {
+  white-space: nowrap;
 }
 
 @media (max-width: 575.98px) {
