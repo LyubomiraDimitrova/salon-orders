@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from '../services/supabase-client.js';
+import { getApprovedAdminProfile } from '../services/admin-access.js';
 
 function createNavigationLink(label, href, isActive = false) {
   const link = document.createElement('a');
@@ -11,8 +12,9 @@ function createNavigationLink(label, href, isActive = false) {
 
 function mountAccountNavigation(header, currentPage) {
   const navigation = header.querySelector('[data-auth-navigation]');
+  let renderedUserId = null;
 
-  function render(session) {
+  async function render(session) {
     const group = document.createElement('div');
     group.className = 'd-lg-flex align-items-lg-center gap-lg-2';
 
@@ -46,16 +48,33 @@ function mountAccountNavigation(header, currentPage) {
 
     group.append(profileLink, logoutButton);
     navigation.replaceChildren(group);
+
+    try {
+      const adminProfile = await getApprovedAdminProfile(session.user.id);
+      if (!adminProfile || renderedUserId !== session.user.id) {
+        return;
+      }
+
+      group.prepend(createNavigationLink('Администрация', 'admin.html', currentPage === 'admin'));
+    } catch {
+      // The protected admin page remains the source of truth when a profile check cannot complete.
+    }
   }
 
   if (!isSupabaseConfigured) {
-    render(null);
+    void render(null);
     return;
   }
 
-  supabase.auth.getSession().then(({ data }) => render(data.session));
+  supabase.auth.getSession().then(({ data }) => {
+    renderedUserId = data.session?.user.id || null;
+    void render(data.session);
+  });
   supabase.auth.onAuthStateChange((_event, session) => {
-    window.setTimeout(() => render(session), 0);
+    window.setTimeout(() => {
+      renderedUserId = session?.user.id || null;
+      void render(session);
+    }, 0);
   });
 }
 
