@@ -1,0 +1,44 @@
+.auth-page {
+  min-height: 70vh;
+}
+
+.auth-card,
+.auth-profile-summary {
+  background-color: var(--salon-surface);
+  border: 1px solid var(--salon-border);
+  border-radius: 1rem;
+  box-shadow: 0 0.75rem 1.75rem rgb(var(--salon-primary-rgb) / 8%);
+}
+
+.auth-profile-summary {
+  border-left: 0.35rem solid var(--salon-secondary-accent);
+  padding: 1rem;
+}
+
+.auth-page .alert {
+  border-color: var(--salon-border);
+}
+
+.auth-page .alert-warning {
+  background-color: var(--salon-soft-accent);
+  color: var(--salon-ink);
+}
+
+.auth-page .alert-info {
+  background-color: var(--salon-secondary-accent);
+  color: var(--salon-ink);
+}
+
+.auth-page .alert-success {
+  background-color: rgb(var(--salon-primary-rgb) / 12%);
+  color: var(--salon-ink);
+}
+
+.auth-page .alert-danger {
+  background-color: rgb(199 131 138 / 18%);
+  color: var(--salon-ink);
+}
+
+.auth-password-toggle {
+  min-width: 5.5rem;
+}

@@ -87,6 +87,18 @@ textarea {
   color: var(--salon-primary) !important;
 }
 
+.auth-logout {
+  background: transparent;
+  border: 0;
+  padding: 0.5rem;
+  text-align: left;
+}
+
+.auth-logout:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .hero-section {
   background: linear-gradient(115deg, var(--salon-page-background) 0%, var(--salon-secondary-accent) 100%);
 }
@@ -179,6 +191,10 @@ a:hover {
 }
 
 @media (min-width: 992px) {
+  .auth-logout {
+    padding: 0.5rem 0;
+  }
+
   .py-lg-6 {
     padding-bottom: 5rem !important;
     padding-top: 5rem !important;
