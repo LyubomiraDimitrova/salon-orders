@@ -3,6 +3,7 @@ import 'bootstrap';
 import '../styles/fonts.css';
 import '../styles/main.css';
 import '../styles/catalog.css';
+import '../styles/admin-products.css';
 
 import { createCatalogPage } from './catalog-page.js';
 import { createFooter } from '../components/footer.js';

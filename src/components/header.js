@@ -55,7 +55,7 @@ function mountAccountNavigation(header, currentPage) {
         return;
       }
 
-      group.prepend(createNavigationLink('Администрация', 'admin.html', currentPage === 'admin'));
+      group.prepend(createNavigationLink('Клиенти', 'admin.html', currentPage === 'admin'));
     } catch {
       // The protected admin page remains the source of truth when a profile check cannot complete.
     }
@@ -104,7 +104,6 @@ export function createHeader({ currentPage = 'home' } = {}) {
           <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
             <li class="nav-item"><a class="nav-link active" aria-current="page" href="/">Начало</a></li>
             <li class="nav-item"><span class="nav-link text-body-secondary">Каталог</span></li>
-            <li class="nav-item"><span class="nav-link text-body-secondary">За салона</span></li>
             <li class="nav-item" data-auth-navigation></li>
           </ul>
         </div>

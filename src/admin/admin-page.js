@@ -107,7 +107,7 @@ export async function createAdminPage() {
       <section class="admin-shell" aria-labelledby="admin-page-title">
         <div class="admin-page-heading">
           <p class="eyebrow mb-2">АДМИНИСТРАЦИЯ</p>
-          <h1 id="admin-page-title" class="h2 mb-2">Одобрение на клиенти</h1>
+          <h1 id="admin-page-title" class="h2 mb-2">Клиенти</h1>
           <p class="text-body-secondary mb-0">Прегледайте регистрациите и променете само статуса им на одобрение.</p>
         </div>
         <div class="admin-page-content mt-4"></div>

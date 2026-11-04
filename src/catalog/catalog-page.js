@@ -1,4 +1,8 @@
 import { loadPublicCatalog } from './catalog-data.js';
+import { getSession, subscribeToSessionChanges } from '../auth/auth-helpers.js';
+import { getApprovedAdminProfile } from '../services/admin-access.js';
+import { isSupabaseConfigured } from '../services/supabase-client.js';
+import { createAdminCatalogManagement } from '../admin-products/admin-products-page.js';
 
 function createElement(tagName, className, text) {
   const element = document.createElement(tagName);
@@ -122,6 +126,7 @@ export function createCatalogPage() {
   const container = createElement('div', 'container');
   const heading = createElement('h1', 'display-5 fw-bold mb-3', 'Каталог');
   const introduction = createElement('p', 'lead text-body-secondary mb-4', 'Разгледайте професионални продукти, подбрани за вашата грижа.');
+  const adminManagement = createElement('section', 'catalog-admin-management-slot');
   const filters = createElement('form', 'catalog-filters row g-3 align-items-end mb-4');
   const searchInput = document.createElement('input');
   const brandSelect = document.createElement('select');
@@ -155,6 +160,51 @@ export function createCatalogPage() {
 
   let catalog = null;
   let loading = false;
+  let adminCheckVersion = 0;
+
+  let adminManagementPage = null;
+
+  function showPublicCatalog() {
+    adminManagement.replaceChildren();
+    filters.hidden = false;
+    summary.hidden = false;
+    content.hidden = false;
+  }
+
+  async function refreshCatalogMode(session) {
+    const version = ++adminCheckVersion;
+    showPublicCatalog();
+
+    if (!isSupabaseConfigured) {
+      return;
+    }
+
+    const sessionResult = session === undefined ? await getSession() : { session };
+    const activeSession = sessionResult.session;
+    if (!activeSession?.user) {
+      return;
+    }
+
+    try {
+      const adminProfile = await getApprovedAdminProfile(activeSession.user.id);
+      if (version !== adminCheckVersion || !adminProfile) {
+        return;
+      }
+
+      filters.hidden = true;
+      summary.hidden = true;
+      content.hidden = true;
+      adminManagementPage ||= createAdminCatalogManagement();
+      const managementPage = await adminManagementPage;
+      if (version === adminCheckVersion) {
+        adminManagement.replaceChildren(managementPage);
+      }
+    } catch {
+      if (version === adminCheckVersion) {
+        showPublicCatalog();
+      }
+    }
+  }
 
   function renderState(title, message, canRetry = false) {
     const state = createElement('div', 'catalog-state text-center py-5');
@@ -253,8 +303,15 @@ export function createCatalogPage() {
     renderProducts();
   });
 
-  container.append(heading, introduction, filters, summary, content);
+  container.append(heading, introduction, adminManagement, filters, summary, content);
   main.append(container);
+  void refreshCatalogMode();
+  subscribeToSessionChanges((_event, session) => {
+    void refreshCatalogMode(session);
+  });
+  window.addEventListener('focus', () => {
+    void refreshCatalogMode();
+  });
   loadCatalog();
   return main;
 }
