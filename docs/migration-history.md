@@ -27,3 +27,17 @@ migration was therefore renamed to
 `supabase/migrations/20261103190742_auth_profiles_and_approval.sql` to match
 the remote version. The remote migration history was not altered and the
 migration was not reapplied.
+
+## 20261104174602 - Admin catalog management
+
+The remote Supabase migration history records `admin_catalog_management` at
+version `20261104174602`. The migration mechanism assigned that version when
+the SQL committed in `dc4ac13` was applied on 2026-11-04; the pending local
+filename had used version `20261104120000`.
+
+The SQL was verified as byte-equivalent to the committed migration (Git blob
+`5cd746ecb15bdbfbffa002fd1a58c7fddabf5e5a`) and was not modified. The local
+migration was renamed to
+`supabase/migrations/20261104174602_admin_catalog_management.sql` to match
+the remote version. The remote migration history was not altered after
+application, and the migration was not reapplied.
