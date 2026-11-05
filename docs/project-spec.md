@@ -80,6 +80,9 @@ This document defines the planned product scope. It does **not** claim that the 
   - `IN_PROGRESS`: currently being handled for delivery.
   - `DENIED`: declined, with a recorded reason.
   - `DONE`: manually marked after delivery, with `delivered_at` recorded.
+- The normal, forward-only workflow is `NEW` → `APPROVED` → `IN_PROGRESS` → `DONE`.
+  `DENIED` is allowed from `NEW`, `APPROVED`, or `IN_PROGRESS`; it requires a
+  reason and releases any active reservations. `DONE` and `DENIED` are terminal.
 - Administrator-created phone/Viber orders may start as `APPROVED` or `IN_PROGRESS`.
 - Status changes are manual in the first version.
 - The administrator has a Today view based on confirmed delivery date.
