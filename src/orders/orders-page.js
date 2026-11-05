@@ -15,6 +15,23 @@ function createElement(tagName, className, text) {
   return element;
 }
 
+function createCustomerNoteSection(order) {
+  const notes = [
+    ['Инструкции за доставка', order.delivery_instructions?.trim()],
+    ['Бележка', order.customer_note?.trim()],
+  ].filter((note, index, all) => note[1] && all.findIndex((candidate) => candidate[1] === note[1]) === index);
+  if (!notes.length) return null;
+  const section = createElement('section', 'mb-4');
+  section.append(createElement('h3', 'h6', 'Бележка от клиента'));
+  notes.forEach((note) => {
+    const paragraph = createElement('p', 'mb-1');
+    if (notes.length > 1) paragraph.append(createElement('strong', null, note[0] + ': '));
+    paragraph.append(document.createTextNode(note[1]));
+    section.append(paragraph);
+  });
+  return section;
+}
+
 function isApprovedClient(profile) {
   return profile?.role === 'client'
     && profile.approval_status === 'approved'
@@ -67,6 +84,10 @@ function createOrderCard(order) {
   appendSnapshotField(delivery, 'Инструкции', order.delivery_instructions);
   appendSnapshotField(delivery, 'Бележка', order.customer_note);
 
+  if (order.customer_note) delivery.lastElementChild?.remove();
+  if (order.delivery_instructions) delivery.lastElementChild?.remove();
+  const customerNote = createCustomerNoteSection(order);
+
   const contact = createElement('section', 'mb-4');
   contact.append(createElement('h3', 'h6', 'Контакт при подаване'));
   appendSnapshotField(contact, 'Салон', order.salon_name_snapshot);
@@ -89,7 +110,9 @@ function createOrderCard(order) {
 
   const changeNotice = createAlert('info', 'За промяна или отказ се свържете с нас.');
   card.append(summary, body);
-  body.append(delivery, contact, products, changeNotice);
+  body.append(delivery);
+  if (customerNote) body.append(customerNote);
+  body.append(contact, products, changeNotice);
   return card;
 }
 
