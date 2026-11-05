@@ -53,3 +53,19 @@ the migration service's final-CRLF normalization: both were 71,903 UTF-8 bytes
 with MD5 `68c8a026bdc23d4a34e03b206b84fcf0`. The local migration was therefore
 renamed to `supabase/migrations/20261105170526_orders_inventory.sql` to match
 the remote history. The remote migration was not reapplied.
+
+## 20261105185529 - Require website delivery date
+
+The remote Supabase migration service assigned version `20261105185529` to
+`require_website_delivery_date` when it applied the SQL committed in
+`ca4501d`. The committed local filename had used version `20261105193131`.
+
+The stored remote `submit_website_order` definition was verified against the
+committed function body after the service's leading-and-trailing-newline
+normalization: both are 2,624 UTF-8 bytes with MD5
+`796e4a4aec04313965b958766cfa0096`. The `authenticated` execute grant is
+present, and `anon` and `public` do not have execute access. The local
+migration was therefore renamed to
+`supabase/migrations/20261105185529_require_website_delivery_date.sql` to
+match the remote history. The remote migration history and SQL were not
+altered, and the migration was not reapplied.
