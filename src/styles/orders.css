@@ -1,0 +1,52 @@
+.client-order-page {
+  min-height: 70vh;
+}
+
+.client-order-card,
+.client-order-summary,
+.client-order-history-card {
+  background-color: var(--salon-surface);
+  border: 1px solid var(--salon-border);
+  border-radius: 1rem;
+  box-shadow: 0 0.75rem 1.75rem rgb(var(--salon-primary-rgb) / 8%);
+}
+
+.client-cart-item + .client-cart-item {
+  border-top: 1px solid var(--salon-border);
+}
+
+.client-cart-quantity {
+  max-width: 6.5rem;
+}
+
+.client-order-history-card summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.client-order-history-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.client-order-history-card summary:focus-visible {
+  border-radius: 0.5rem;
+  outline: 3px solid var(--salon-focus-ring);
+  outline-offset: 0.15rem;
+}
+
+.client-order-snapshot-list {
+  margin-bottom: 0;
+  padding-left: 1.1rem;
+}
+
+.client-order-snapshot-list li + li {
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 575.98px) {
+  .client-order-card,
+  .client-order-summary,
+  .client-order-history-card {
+    border-radius: 0.8rem;
+  }
+}

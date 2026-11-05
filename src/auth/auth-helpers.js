@@ -4,7 +4,8 @@ export const PROFILE_PAGE = 'profile.html';
 
 export function getSafeNextPage() {
   const nextPage = new URLSearchParams(window.location.search).get('next');
-  return nextPage === PROFILE_PAGE ? nextPage : PROFILE_PAGE;
+  const allowedPages = [PROFILE_PAGE, 'cart.html', 'orders.html'];
+  return allowedPages.includes(nextPage) ? nextPage : PROFILE_PAGE;
 }
 
 export function createAlert(type, message) {

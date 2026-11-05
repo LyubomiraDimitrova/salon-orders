@@ -1,8 +1,9 @@
 import { loadPublicCatalog } from './catalog-data.js';
-import { getSession, subscribeToSessionChanges } from '../auth/auth-helpers.js';
+import { getSession, loadOwnProfile, subscribeToSessionChanges } from '../auth/auth-helpers.js';
 import { getApprovedAdminProfile } from '../services/admin-access.js';
 import { isSupabaseConfigured } from '../services/supabase-client.js';
 import { createAdminCatalogManagement } from '../admin-products/admin-products-page.js';
+import { addProductToClientCart } from '../orders/client-order-store.js';
 
 function createElement(tagName, className, text) {
   const element = document.createElement(tagName);
@@ -68,7 +69,7 @@ function createImage(productName, imagePath) {
   return image;
 }
 
-function createProductCard(product, brandName, categoryName) {
+function createProductCard(product, brandName, categoryName, onAddToCart) {
   const column = createElement('div', 'col');
   const card = createElement('article', 'card catalog-product-card border-0');
   const media = createElement('div', 'catalog-product-media');
@@ -92,6 +93,17 @@ function createProductCard(product, brandName, categoryName) {
   addDetail(details, 'Концентрация', product.developer_concentration);
   detailDisclosure.append(detailsSummary, details);
   body.append(detailDisclosure);
+
+  if (onAddToCart) {
+    const addButton = createElement('button', 'btn btn-primary w-100 mt-3', 'Добави в кошницата');
+    addButton.type = 'button';
+    addButton.addEventListener('click', () => {
+      onAddToCart(product);
+      addButton.textContent = 'Добавено';
+    });
+    body.append(addButton);
+  }
+
   card.append(media, body);
   column.append(card);
   return column;
@@ -161,6 +173,7 @@ export function createCatalogPage() {
   let catalog = null;
   let loading = false;
   let adminCheckVersion = 0;
+  let clientOrderingAccountId = null;
 
   let adminManagementPage = null;
 
@@ -182,15 +195,27 @@ export function createCatalogPage() {
     const sessionResult = session === undefined ? await getSession() : { session };
     const activeSession = sessionResult.session;
     if (!activeSession?.user) {
+      clientOrderingAccountId = null;
+      renderProducts();
       return;
     }
 
     try {
       const adminProfile = await getApprovedAdminProfile(activeSession.user.id);
       if (version !== adminCheckVersion || !adminProfile) {
+        if (version === adminCheckVersion) {
+          const { profile } = await loadOwnProfile(activeSession.user.id);
+          clientOrderingAccountId = profile?.role === 'client'
+            && profile.approval_status === 'approved'
+            && profile.salon_client_id
+            ? activeSession.user.id
+            : null;
+          renderProducts();
+        }
         return;
       }
 
+      clientOrderingAccountId = null;
       filters.hidden = true;
       summary.hidden = true;
       content.hidden = true;
@@ -201,7 +226,9 @@ export function createCatalogPage() {
       }
     } catch {
       if (version === adminCheckVersion) {
+        clientOrderingAccountId = null;
         showPublicCatalog();
+        renderProducts();
       }
     }
   }
@@ -259,7 +286,17 @@ export function createCatalogPage() {
     const grid = createElement('div', 'row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-4');
 
     products.forEach((product) => {
-      grid.append(createProductCard(product, brandNames.get(String(product.brand_id)), categoryNames.get(String(product.category_id))));
+      grid.append(createProductCard(
+        product,
+        brandNames.get(String(product.brand_id)),
+        categoryNames.get(String(product.category_id)),
+        clientOrderingAccountId
+          ? (selectedProduct) => addProductToClientCart(clientOrderingAccountId, {
+            ...selectedProduct,
+            brandName: brandNames.get(String(selectedProduct.brand_id)),
+          })
+          : null,
+      ));
     });
 
     summary.textContent = `Открити продукти: ${products.length}`;
