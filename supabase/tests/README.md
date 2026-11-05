@@ -1,7 +1,7 @@
 # Orders and inventory runtime tests
 
 These tests target a disposable **local** Supabase/Postgres stack after all
-migrations, including `20261105160958_orders_inventory.sql`, have been applied.
+migrations, including `20261105170526_orders_inventory.sql`, have been applied.
 They use only fictional UUIDs, email addresses, salons, products, and prices.
 
 ## Serial suite

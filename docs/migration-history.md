@@ -41,3 +41,15 @@ migration was renamed to
 `supabase/migrations/20261104174602_admin_catalog_management.sql` to match
 the remote version. The remote migration history was not altered after
 application, and the migration was not reapplied.
+
+## 20261105170526 - Orders and inventory
+
+The remote Supabase migration service assigned version `20261105170526` when
+the reviewed `orders_inventory` SQL was applied on 2026-11-05. The committed
+local filename had used version `20261105160958`.
+
+The remote stored statement was verified as equivalent to the local SQL after
+the migration service's final-CRLF normalization: both were 71,903 UTF-8 bytes
+with MD5 `68c8a026bdc23d4a34e03b206b84fcf0`. The local migration was therefore
+renamed to `supabase/migrations/20261105170526_orders_inventory.sql` to match
+the remote history. The remote migration was not reapplied.
