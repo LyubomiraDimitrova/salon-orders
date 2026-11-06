@@ -7,6 +7,54 @@ const labels = { NEW: 'Нова', APPROVED: 'Одобрена', IN_PROGRESS: 'В
 const euro = new Intl.NumberFormat('bg-BG', { style: 'currency', currency: 'EUR' });
 const e = (tag, cls, text) => { const x = document.createElement(tag); x.className = cls || ''; if (text !== undefined) x.textContent = text; return x; };
 const blank = (v) => v || '—';
+const sofiaDateTimeFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Europe/Sofia', year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+});
+const sofiaDisplayFormatter = new Intl.DateTimeFormat('bg-BG', {
+  timeZone: 'Europe/Sofia', dateStyle: 'medium', timeStyle: 'short',
+});
+
+function sofiaDateTimeValues(value) {
+  const parts = sofiaDateTimeFormatter.formatToParts(value);
+  const fields = Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
+  return { date: `${fields.year}-${fields.month}-${fields.day}`, time: `${fields.hour}:${fields.minute}:${fields.second}` };
+}
+
+function sofiaOffsetMinutes(value) {
+  const fields = sofiaDateTimeValues(value);
+  const [year, month, day] = fields.date.split('-').map(Number);
+  const [hour, minute, second] = fields.time.split(':').map(Number);
+  return (Date.UTC(year, month - 1, day, hour, minute, second) - value.getTime()) / 60000;
+}
+
+function sofiaDateTimeToIso(dateValue, timeValue) {
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateValue || '');
+  const timeMatch = /^(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(timeValue || '');
+  if (!dateMatch || !timeMatch) return null;
+  const [year, month, day] = dateMatch.slice(1).map(Number);
+  const [hour, minute, second = 0] = timeMatch.slice(1).map((value) => Number(value || 0));
+  const wallTime = Date.UTC(year, month - 1, day, hour, minute, second);
+  const offsets = new Set([-12, -6, 0, 6, 12].map((hours) => sofiaOffsetMinutes(new Date(wallTime + hours * 60 * 60 * 1000))));
+  const candidates = [...offsets]
+    .map((offset) => new Date(wallTime - offset * 60 * 1000))
+    .filter((candidate) => {
+      const values = sofiaDateTimeValues(candidate);
+      return values.date === dateValue && values.time === timeValue;
+    })
+    .sort((first, second) => first.getTime() - second.getTime());
+  return candidates[0]?.toISOString() || null;
+}
+
+function savedOperation(key) {
+  try { return JSON.parse(sessionStorage.getItem('salon-orders:order-op:' + key)); } catch { return null; }
+}
+
+function displaySofiaDateTime(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '—' : sofiaDisplayFormatter.format(date);
+}
 function customerNotes(order) {
   return [
     ['Инструкции за доставка', order.delivery_instructions?.trim()],
@@ -110,6 +158,11 @@ export async function createAdminOrdersPage() {
   function detail() {
     const o = state.order; const detailBox = content.querySelector('[data-detail]'); const current = state.lines.filter((x) => x.is_current); const fullyReserved = current.every((x) => activeQty(x) === x.quantity);
     detailBox.innerHTML = '<div class="d-flex justify-content-between mb-3"><div><p class="eyebrow mb-1">ПОРЪЧКА № ' + o.order_number + '</p><h2 class="h4 mb-0">' + labels[o.status] + '</h2></div><span class="badge text-bg-secondary">' + o.source + '</span></div><div data-feedback></div><div class="snapshot-grid"><div><b>Салон</b><br>' + blank(o.salon_name_snapshot) + '</div><div><b>Контакт</b><br>' + blank(o.contact_name_snapshot) + '<br>' + blank(o.phone_snapshot) + '<br>' + blank(o.email_snapshot) + '</div><div><b>Адрес</b><br>' + blank(o.address_snapshot) + '</div><div><b>Желан ден за доставка</b><br>' + (o.requested_delivery_date || 'Не е посочен') + '</div><div><b>Потвърден ден за доставка</b><br>' + (o.confirmed_delivery_date || 'Още не е потвърден') + '</div><div><b>Бележка за доставка от клиента</b><br>' + (o.delivery_instructions || 'Не е посочена') + '</div><div><b>Бележка към поръчката</b><br>' + blank(o.customer_note) + '</div></div><details class="mt-3"><summary>Дати и детайли за доставка</summary><form class="row g-2 pt-3" data-delivery>' + dateInputs(o) + '<div class="col-12"><label class="form-label">Инструкции</label><textarea class="form-control" name="instructions">' + (o.delivery_instructions || '') + '</textarea></div><div class="col-12"><label class="form-label">Бележка</label><textarea class="form-control" name="note">' + (o.customer_note || '') + '</textarea></div>' + (['APPROVED','IN_PROGRESS'].includes(o.status) ? '<div class="col-12"><button class="btn btn-outline-primary w-100">Запази детайлите</button></div>' : '') + '</form></details><h3 class="h5 mt-4">Редове и резервиране</h3><div data-lines></div><details class="mt-3"><summary>Исторически цени и общо</summary><div class="pt-3" data-prices>Зареждане…</div></details><div class="admin-order-actions mt-4" data-actions></div>';
+    if (o.status === 'DONE') {
+      const actual = e('div');
+      actual.append(e('b', '', 'Реална дата и час на доставка'), document.createElement('br'), document.createTextNode(displaySofiaDateTime(o.delivered_at)));
+      detailBox.querySelector('.snapshot-grid').append(actual);
+    }
     [...detailBox.querySelectorAll('.snapshot-grid > div')].filter((item) => item.textContent.startsWith('Бележка за доставка') || item.textContent.startsWith('Бележка към')).forEach((item) => item.remove());
     const notes = customerNotes(o);
     if (notes.length) {
@@ -160,10 +213,43 @@ export async function createAdminOrdersPage() {
     const actions = detailBox.querySelector('[data-actions]');
     if (o.status === 'NEW') { const f = e('form', ''); f.innerHTML = '<label class="form-label fw-semibold">Потвърдена дата</label><input class="form-control mb-2" name="date" type="date" required><div class="row g-2"><div class="col"><input class="form-control" name="from" type="time"></div><div class="col"><input class="form-control" name="to" type="time"></div></div><button class="btn btn-primary w-100 mt-2">Одобри и резервирай</button>'; f.onsubmit = (ev) => { ev.preventDefault(); run(f.querySelector('button'), feedback, () => rpc('approve_order', { p_order_id:o.id, p_confirmed_delivery_date:f.date.value, p_confirmed_delivery_time_from:f.from.value || null, p_confirmed_delivery_time_to:f.to.value || null, p_delivery_instructions:null }, 'approve:' + o.id)); }; actions.append(f); }
     if (o.status === 'APPROVED') actions.append(button('Начни обработка', 'btn-outline-primary', feedback, () => rpc('start_order_delivery', { p_order_id:o.id }, 'start:' + o.id)));
-    if (o.status === 'IN_PROGRESS') actions.append(button('Отбележи като доставена', 'btn-success', feedback, () => rpc('deliver_order', { p_order_id:o.id, p_delivered_at:new Date().toISOString() }, 'deliver:' + o.id), !fullyReserved, 'Потвърждавате ли доставката?'));
+    if (o.status === 'IN_PROGRESS') actions.append(deliveryCompletionForm(o, feedback, fullyReserved));
     if (['NEW','APPROVED','IN_PROGRESS'].includes(o.status)) actions.append(button('Откажи поръчката', 'btn-outline-danger', feedback, async () => { const reason = window.prompt('Посочете задължителна причина за отказ:'); if (!reason?.trim()) throw new Error('Причината за отказ е задължителна.'); await rpc('deny_order', { p_order_id:o.id, p_denial_reason:reason }, 'deny:' + o.id); }, false, 'Потвърждавате ли отказа?'));
     const delivery = detailBox.querySelector('[data-delivery]'); if (delivery) delivery.onsubmit = (ev) => { ev.preventDefault(); run(delivery.querySelector('button'), feedback, () => rpc('update_order_delivery_details', { p_order_id:o.id, p_requested_delivery_date:delivery.requestedDate.value || null, p_requested_delivery_time_from:delivery.requestedFrom.value || null, p_requested_delivery_time_to:delivery.requestedTo.value || null, p_confirmed_delivery_date:delivery.confirmedDate.value || null, p_confirmed_delivery_time_from:delivery.confirmedFrom.value || null, p_confirmed_delivery_time_to:delivery.confirmedTo.value || null, p_delivery_instructions:o.delivery_instructions, p_customer_note:o.customer_note }, 'details:' + o.id)); };
     prices(detailBox.querySelector('[data-prices]'), o.id);
+  }
+  function deliveryCompletionForm(order, feedback, fullyReserved) {
+    const key = 'deliver:' + order.id;
+    const saved = savedOperation(key);
+    const savedTimestamp = saved?.payload?.p_order_id === order.id && saved?.payload?.p_delivered_at;
+    const values = sofiaDateTimeValues(savedTimestamp ? new Date(saved.payload.p_delivered_at) : new Date());
+    const form = e('form', 'delivery-completion-form');
+    form.noValidate = true;
+    form.append(e('h3', 'h5 mb-1', 'Реална дата и час на доставка'));
+    form.append(e('p', 'text-body-secondary small mb-3', 'Часът се тълкува в часовата зона Европа/София. Доставката ще приспадне резервираната наличност. Ако същата продажба вече е приспадната ръчно, първо я изравнете.'));
+    if (savedTimestamp) form.append(createAlert('warning', 'Има непотвърдена заявка за доставка. Повторението ще използва същите дата, час и UUID.'));
+    if (!fullyReserved) form.append(createAlert('warning', 'Първо резервирайте всички количества, за да отбележите доставка.'));
+    const row = e('div', 'row g-2');
+    [['date', 'Дата', values.date], ['time', 'Час', values.time]].forEach(([name, label, value]) => {
+      const field = e('div', 'col-12 col-sm-6'); const input = e('input', 'form-control');
+      input.type = name; input.name = name; input.value = value; input.required = true; input.disabled = !!savedTimestamp; if (name === 'time') input.step = '1';
+      const inputLabel = e('label', 'form-label fw-semibold', label); inputLabel.htmlFor = `actual-delivery-${name}-${order.id}`; input.id = inputLabel.htmlFor;
+      field.append(inputLabel, input); row.append(field);
+    });
+    const submit = e('button', 'btn btn-success w-100 mt-3', savedTimestamp ? 'Повтори отбелязването на доставка' : 'Отбележи като доставена');
+    submit.type = 'submit'; submit.disabled = !fullyReserved; submit.title = !fullyReserved ? 'Първо резервирайте всички количества.' : '';
+    form.append(row, submit);
+    form.onsubmit = (event) => {
+      event.preventDefault();
+      const p_delivered_at = savedTimestamp || sofiaDateTimeToIso(form.elements.date.value, form.elements.time.value);
+      if (!p_delivered_at) {
+        message(feedback, 'danger', 'Въведеният час не е валиден за Европа/София. Изберете друга дата или час.');
+        return;
+      }
+      if (!window.confirm('Потвърждавате ли доставката? Тя ще приспадне резервираната наличност. Ако тази продажба вече е приспадната ръчно, първо я изравнете.')) return;
+      run(submit, feedback, () => rpc('deliver_order', { p_order_id: order.id, p_delivered_at }, key));
+    };
+    return form;
   }
   function dateInputs(o) { return [['requestedDate','Заявена дата',o.requested_delivery_date,'date'],['requestedFrom','Заявено от',o.requested_delivery_time_from,'time'],['requestedTo','Заявено до',o.requested_delivery_time_to,'time'],['confirmedDate','Потвърдена дата',o.confirmed_delivery_date,'date'],['confirmedFrom','Потвърдено от',o.confirmed_delivery_time_from,'time'],['confirmedTo','Потвърдено до',o.confirmed_delivery_time_to,'time']].map((x) => '<div class="col-6"><label class="form-label">' + x[1] + '</label><input class="form-control" name="' + x[0] + '" type="' + x[3] + '" value="' + (x[2] || '') + '"></div>').join(''); }
   async function load(id) { state.selectedOrderId = id; const v = ++state.version; const { data:o, error } = await supabase.from('orders').select(orderFields).eq('id',id).single(); if (v !== state.version) return; if (error) { const feedback = content.querySelector('[data-feedback]'); if (feedback) message(feedback, 'danger', 'Детайлите не могат да бъдат обновени. Последно заредените данни остават видими.'); return; } const {data:lines} = await supabase.from('order_lines').select('id, order_id, product_id, product_name_snapshot, product_size_snapshot, quantity, is_current').eq('order_id',id); const ids=(lines || []).map((x)=>x.id); const [{data:reservations},{data:stock}] = await Promise.all([ids.length ? supabase.from('stock_reservations').select('order_line_id, quantity, status').in('order_line_id',ids) : Promise.resolve({data:[]}),supabase.from('stock_levels').select('product_id, physical_quantity, reserved_quantity')]); if(v!==state.version)return; state.order=o;state.lines=lines||[];state.reservations=reservations||[];state.stock=stock||[]; detail(); redraw?.(); }
