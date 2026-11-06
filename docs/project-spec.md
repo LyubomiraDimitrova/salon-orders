@@ -117,10 +117,11 @@ This document defines the planned product scope. It does **not** claim that the 
 ### Analytics
 
 - Reports include only orders recorded in this application.
-- Count sales from `DONE` orders using `delivered_at`.
-- Support week, month, year, and custom-period filters.
-- Show delivered-order count, units, sales value including VAT, top products, top brands, and a salon breakdown.
-- Show sale value minus reference purchase value and label it explicitly as a **difference including VAT**, not net profit.
+- The initial sales report counts only current lines from `DONE` orders using `delivered_at`.
+- A selected start and end date are inclusive Europe/Sofia calendar dates; week, month, year, and custom periods use that range.
+- Show total units sold and units per product, grouped by `product_id` so product renames do not split totals.
+- Each product uses the latest historical order-line snapshot in the selected period, including name, article code, size, shade, and developer concentration where present.
+- Salon-client, brand, revenue, purchase-price, and sale/purchase-difference reporting are deferred.
 
 ## Planned screens
 

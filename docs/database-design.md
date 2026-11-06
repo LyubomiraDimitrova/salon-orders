@@ -129,5 +129,5 @@ The database transaction, row locking, constraints, and reservation audit rowsâ€
 - Use foreign keys with `ON DELETE RESTRICT` (or archive records) for products referenced by order lines. Do not delete historical products.
 - Add indexes for each foreign key, including `orders.salon_client_id`, `order_lines.order_id`, `stock_reservations.order_line_id`, and the profile/order ownership path.
 - Add practical list indexes such as `orders(status, confirmed_delivery_date)` for the new-order count and Today view, and product-list indexes supporting visible/category/recommended ordering.
-- Keep reports as administrator-only queries over `DONE` orders and `delivered_at`; they are not source-of-truth tables in the first version.
+- Keep reports as administrator-only queries over current order lines from `DONE` orders and `delivered_at`; they are not source-of-truth tables in the first version. The initial report uses inclusive Europe/Sofia calendar dates and returns total units plus a `product_id`-grouped product breakdown with the latest in-range line snapshot. Salon-client, brand, and financial reporting are deferred.
 - Implement all schema and policy changes later as reviewed SQL migrations, then test RLS with visitor, pending-client, approved-client, and administrator accounts.
