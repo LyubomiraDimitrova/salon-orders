@@ -19,6 +19,8 @@ Supabase stack simulates browser JWT requests.
 
 ## Concurrency suite
 
+Separate concurrent-session execution is deferred for the current implementation iteration. The scripts remain documented for a later local run; do not weaken or remove the existing database row-locking and atomic protections while these tests are deferred.
+
 Concurrency cannot be tested inside the serial file's rollback transaction:
 two independent sessions are necessary for row locks to contend.
 

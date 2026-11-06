@@ -88,7 +88,7 @@ This document defines the planned product scope. It does **not** claim that the 
 - The administrator has a Today view based on confirmed delivery date.
 - Administrators can create, review, and manage orders.
 - Submitted orders cannot be edited or cancelled directly by clients. Show: "За промяна или отказ се свържете с нас". The administrator records an agreed change or cancellation.
-- On a new website order, notify the administrator by email using a server-side email service. The order must still be saved if sending fails, and the notification failure must be stored for retry.
+- Order email notifications are deferred. A future server-side email service must not roll back a saved order when sending fails, and must retain failures for retry.
 
 ### Prices
 
@@ -138,6 +138,8 @@ This document defines the planned product scope. It does **not** claim that the 
 ## Initial exclusions
 
 The first release excludes online payments, automatic Viber integration, partial deliveries, returns, accounting/invoicing, and automatic daily status changes.
+
+Order email notifications are deferred. Separate concurrent-session tests are also deferred for this iteration; the existing database locking, constraints, idempotency, and atomic server-side protections remain required and must not be replaced by client-side checks.
 
 ## Open implementation detail
 

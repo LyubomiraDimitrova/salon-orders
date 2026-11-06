@@ -1,0 +1,98 @@
+.inventory-page {
+  min-height: 70vh;
+}
+
+.inventory-shell {
+  margin-inline: auto;
+  max-width: 78rem;
+}
+
+.inventory-heading,
+.inventory-panel {
+  background: var(--salon-surface);
+  border: 1px solid var(--salon-border);
+  border-radius: 1rem;
+  box-shadow: 0 .75rem 1.75rem rgb(var(--salon-primary-rgb) / 8%);
+  padding: 1.25rem;
+}
+
+.inventory-product-list,
+.movement-list {
+  display: grid;
+  gap: .75rem;
+}
+
+.inventory-product {
+  background: var(--salon-soft-accent);
+  border: 1px solid var(--salon-border);
+  border-radius: .75rem;
+  color: inherit;
+  display: grid;
+  gap: .25rem;
+  padding: .85rem;
+  text-align: left;
+  width: 100%;
+}
+
+.inventory-product.selected {
+  outline: 3px solid rgb(var(--salon-primary-rgb) / 35%);
+}
+
+.inventory-product:focus-visible {
+  outline: 3px solid var(--salon-focus-ring);
+  outline-offset: .15rem;
+}
+
+.inventory-balance-grid {
+  display: grid;
+  gap: .75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.inventory-balance {
+  background: var(--salon-soft-accent);
+  border: 1px solid var(--salon-border);
+  border-radius: .75rem;
+  padding: .75rem;
+}
+
+.inventory-balance strong {
+  display: block;
+  font-size: 1.45rem;
+}
+
+.inventory-unknown {
+  border-style: dashed;
+}
+
+.inventory-action {
+  border-top: 1px solid var(--salon-border);
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.movement-card {
+  border-bottom: 1px solid var(--salon-border);
+  display: grid;
+  gap: .15rem;
+  padding: .75rem 0;
+}
+
+.movement-card:last-child {
+  border-bottom: 0;
+}
+
+.quantity-positive {
+  color: #176b3a;
+}
+
+.quantity-negative {
+  color: #9a3139;
+}
+
+@media (min-width: 576px) {
+  .inventory-heading,
+  .inventory-panel {
+    padding: 1.5rem;
+  }
+}

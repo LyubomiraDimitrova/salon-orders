@@ -47,7 +47,7 @@ An administrator creates and edits products and descriptions. Missing inventory 
 | `order_lines` | `id bigint PK`, `order_id FK`, `product_id FK`, product/size/article/brand/series/shade/developer snapshots, `quantity`, `is_current`, `replaced_at`, `created_at` | The products and positive quantities requested. Server-side snapshots keep the order readable if a product is later renamed, hidden, archived, or moved to another brand/series. |
 | `order_line_quantity_changes` | `id bigint PK`, `order_line_id FK`, `previous_quantity`, `new_quantity`, `changed_by_profile_id`, `operation_request_id`, `changed_at` | Immutable audit record created before an approved current line's quantity is changed. |
 | `order_line_price_snapshots` | `order_line_id PK/FK`, `retail_price`, `salon_sale_price`, `reference_purchase_price`, `currency` | One protected price snapshot for each order line. It is separate from client-readable order lines so clients cannot obtain prices through the public API. |
-| `order_notifications` | `id bigint PK`, `order_id FK`, `channel`, `status`, `attempt_count`, `last_error`, `next_retry_at`, `sent_at` | Records the server-side email notification for a new website order. A failed email does not roll back the order and can be retried. |
+| `order_notifications` | `id bigint PK`, `order_id FK`, `channel`, `status`, `attempt_count`, `last_error`, `next_retry_at`, `sent_at` | Reserved audit foundation for a future server-side email notification. Email delivery is deferred; when enabled, a failed email must not roll back the order and can be retried. |
 
 The application creates an order with its line snapshots atomically. Clients can read their own non-price order data but cannot directly update or cancel submitted orders. Administrators record any agreed change or cancellation.
 
@@ -122,7 +122,7 @@ This separation is necessary because RLS controls rows, not a convenient guarant
 
 For an approved-order edit, the server reconciles old and new reservations in one transaction before persisting the change. A retained product line keeps its original product and price snapshots; a quantity change writes an immutable quantity-audit record first. A genuinely new/replacement product receives a new current-price snapshot. Delivery and denial operations must be idempotent: a repeated request sees the already-consumed or already-released reservation state and makes no second stock change.
 
-The database transaction, row locking, constraints, and reservation audit rows—not the user interface—prevent a unit from being allocated twice or availability from becoming negative.
+The database transaction, row locking, constraints, and reservation audit rows—not the user interface—prevent a unit from being allocated twice or availability from becoming negative. Separate concurrent-session tests are deferred for this iteration, but these database protections remain required.
 
 ## Implementation notes for later migrations
 
