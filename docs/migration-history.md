@@ -69,3 +69,18 @@ migration was therefore renamed to
 `supabase/migrations/20261105185529_require_website_delivery_date.sql` to
 match the remote history. The remote migration history and SQL were not
 altered, and the migration was not reapplied.
+
+## 20261106144130 - Admin sales reporting
+
+The remote Supabase migration service assigned version `20261106144130` to
+`admin_sales_reporting` when it applied the SQL committed in `308bb0d`. The
+committed local filename originally used version `20261106154358`.
+
+On 2026-11-06, the remote migration record was inspected and its one stored
+statement was verified as identical to the committed reporting SQL (Git blob
+`94ba7c5b55f4f159a08164026dc453e8691f5eba`). The remote function definitions,
+explicit grants, and partial index were also verified. The local migration was
+therefore renamed to
+`supabase/migrations/20261106144130_admin_sales_reporting.sql` to match the
+remote history. The SQL was not changed, and the remote migration was not
+reapplied.
