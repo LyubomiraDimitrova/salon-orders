@@ -27,10 +27,25 @@ export async function createAdminOrdersPage() {
   const main = e('main', 'admin-orders-page py-4 py-md-5');
   main.innerHTML = '<div class="container"><section class="admin-orders-shell"><header class="admin-orders-heading"><div><p class="eyebrow mb-1">АДМИНИСТРАЦИЯ</p><h1 class="h2 mb-1">Поръчки</h1><p class="text-body-secondary mb-0">Обработка, резервиране и доставка.</p></div><span class="badge text-bg-danger new-count" data-new>0 нови</span></header><div class="admin-orders-content mt-4"></div></section></div>';
   const content = main.querySelector('.admin-orders-content');
-  const state = { orders: [], order: null, selectedOrderId: null, searchQuery: '', statusFilter: '', lines: [], summaryLines: [], reservations: [], stock: [], busy: false, version: 0, summaryVersion: 0 };
+  const state = { orders: [], order: null, selectedOrderId: null, searchQuery: '', statusFilter: '', lines: [], summaryLines: [], reservations: [], stock: [], busy: false, version: 0, summaryVersion: 0, clients: null, products: null, prices: null, createBusy: false };
   const clear = (message) => { state.version += 1; state.orders = []; state.order = null; content.replaceChildren(createAlert('warning', message)); };
   const rpc = async (name, payload, key) => { const op = requestId(key, payload); const { error } = await supabase.rpc(name, { p_request_id: op.id, ...op.payload }); if (error) throw error; sessionStorage.removeItem(op.k); };
   const message = (box, type, text) => box.replaceChildren(createAlert(type, text));
+  const adminCreateKey = 'salon-orders:admin-create-order';
+  const adminOrderOperation = () => { try { return JSON.parse(sessionStorage.getItem(adminCreateKey)); } catch { return null; } };
+  async function ensureNewOrderData() {
+    if (state.clients && state.products && state.prices) return;
+    const [clients, products, prices] = await Promise.all([
+      supabase.from('salon_clients').select('id, salon_name, contact_name, phone, email').order('salon_name'),
+      supabase.from('products').select('id, name, article_code, size_label').order('name'),
+      supabase.rpc('get_admin_product_prices'),
+    ]);
+    if (clients.error || products.error || prices.error) return;
+    state.clients = clients.data || []; state.products = products.data || []; state.prices = new Map((prices.data || []).map((price) => [String(price.product_id), price]));
+    redraw = renderList();
+  }
+  const newUuid = () => crypto.randomUUID();
+  const priceLabel = (product) => { const price = state.prices?.get(String(product.id)); return `${product.name}${product.article_code ? ` (${product.article_code})` : ''} — ${price ? euro.format(price.retail_price) : 'без въведена цена'}`; };
   const currentSummaryLines = (orderId) => state.summaryLines.filter((line) => line.order_id === orderId && line.is_current);
   const productSummary = (orderId) => {
     const lines = currentSummaryLines(orderId);
@@ -52,9 +67,36 @@ export async function createAdminOrdersPage() {
     redraw?.();
   }
 
+  function newOrderPanel() {
+    const panel = e('details', 'admin-order-panel mb-3');
+    panel.open = false;
+    panel.append(e('summary', '', 'Нова поръчка'));
+    const body = e('div', 'pt-3'); panel.append(body);
+    if (!state.clients || !state.products || !state.prices) { body.append(createAlert('info', 'Зареждане на клиенти, продукти и цени…')); void ensureNewOrderData(); return panel; }
+    let retry = adminOrderOperation();
+    if (retry) body.append(createAlert('warning', 'Има непотвърдена заявка за нова поръчка. Повторете я със запазените UUID и данни.'));
+    const form = e('form', 'row g-3'); const feedback = e('div', 'col-12'); form.append(feedback);
+    const clientField = e('div', 'col-12'); const client = e('select', 'form-select'); client.name = 'client'; client.required = true; client.append(e('option', '', 'Изберете салон')); state.clients.forEach((item) => { const option = e('option', '', `${item.salon_name || item.contact_name || 'Салон без име'}${item.phone ? ` · ${item.phone}` : ''}`); option.value = item.id; client.append(option); }); clientField.append(e('label', 'form-label fw-semibold', 'Салон клиент'), client); form.append(clientField);
+    const sourceField = e('div', 'col-6'); const source = e('select', 'form-select'); source.name = 'source'; [['phone', 'Телефон'], ['viber', 'Viber']].forEach(([value, label]) => { const option = e('option', '', label); option.value = value; source.append(option); }); sourceField.append(e('label', 'form-label fw-semibold', 'Източник'), source);
+    const statusField = e('div', 'col-6'); const status = e('select', 'form-select'); status.name = 'status'; [['APPROVED', 'Одобрена'], ['IN_PROGRESS', 'В обработка']].forEach(([value, label]) => { const option = e('option', '', label); option.value = value; status.append(option); }); statusField.append(e('label', 'form-label fw-semibold', 'Начален статус'), status); form.append(sourceField, statusField);
+    const requestedDate = e('input', 'form-control'); requestedDate.type = 'date'; requestedDate.name = 'requestedDate'; const confirmedDate = e('input', 'form-control'); confirmedDate.type = 'date'; confirmedDate.name = 'confirmedDate'; [['Заявена дата', requestedDate], ['Потвърдена дата', confirmedDate]].forEach(([label, input]) => { const field = e('div', 'col-6'); field.append(e('label', 'form-label fw-semibold', label), input); form.append(field); });
+    const requestedFrom = e('input', 'form-control'); requestedFrom.type = 'time'; requestedFrom.name = 'requestedFrom'; const requestedTo = e('input', 'form-control'); requestedTo.type = 'time'; requestedTo.name = 'requestedTo'; const confirmedFrom = e('input', 'form-control'); confirmedFrom.type = 'time'; confirmedFrom.name = 'confirmedFrom'; const confirmedTo = e('input', 'form-control'); confirmedTo.type = 'time'; confirmedTo.name = 'confirmedTo'; [['Заявено от', requestedFrom], ['Заявено до', requestedTo], ['Потвърдено от', confirmedFrom], ['Потвърдено до', confirmedTo]].forEach(([label, input]) => { const field = e('div', 'col-6'); field.append(e('label', 'form-label', label), input); form.append(field); });
+    const instructions = e('textarea', 'form-control'); instructions.name = 'instructions'; instructions.rows = 2; const note = e('textarea', 'form-control'); note.name = 'note'; note.rows = 2; [['Инструкции за доставка', instructions], ['Бележка', note]].forEach(([label, input]) => { const field = e('div', 'col-12'); field.append(e('label', 'form-label fw-semibold', label), input); form.append(field); });
+    const linesBox = e('div', 'col-12'); linesBox.append(e('h3', 'h6 mb-2', 'Продукти'));
+    const rows = e('div', 'd-grid gap-2'); const add = e('button', 'btn btn-outline-primary w-100 mt-2', 'Добави продукт'); add.type = 'button';
+    const addRow = () => { const row = e('div', 'row g-2 align-items-end'); const productField = e('div', 'col-8'); const product = e('select', 'form-select'); product.required = true; product.append(e('option', '', 'Изберете продукт')); state.products.forEach((item) => { const option = e('option', '', priceLabel(item)); option.value = item.id; product.append(option); }); productField.append(e('label', 'form-label', 'Продукт'), product); const quantityField = e('div', 'col-3'); const quantity = e('input', 'form-control'); quantity.type = 'number'; quantity.min = '1'; quantity.step = '1'; quantity.value = '1'; quantity.required = true; quantityField.append(e('label', 'form-label', 'Брой'), quantity); const removeField = e('div', 'col-1'); const remove = e('button', 'btn btn-outline-danger w-100', '×'); remove.type = 'button'; remove.ariaLabel = 'Премахни продукт'; remove.onclick = () => row.remove(); removeField.append(remove); row.append(productField, quantityField, removeField); rows.append(row); };
+    add.onclick = addRow; addRow(); linesBox.append(rows, add, e('p', 'form-text mb-0', 'Недостатъчната или неизвестна наличност не спира създаването.')); form.append(linesBox);
+    const submitField = e('div', 'col-12'); const submit = e('button', 'btn btn-primary w-100', retry ? 'Повтори новата поръчка' : 'Създай поръчка'); submit.type = 'submit'; submitField.append(submit); form.append(submitField);
+    form.onsubmit = async (event) => { event.preventDefault(); if (state.createBusy) return; const lineValues = [...rows.children].map((row) => ({ product_id: Number(row.querySelector('select').value), quantity: Number(row.querySelector('input').value) })); if (!client.value || !lineValues.length || lineValues.some((line) => !Number.isInteger(line.product_id) || !Number.isInteger(line.quantity) || line.quantity <= 0)) { message(feedback, 'danger', 'Изберете салон и поне един продукт с положително цяло количество.'); return; }
+      const payload = { p_salon_client_id: Number(client.value), p_source: source.value, p_initial_status: status.value, p_requested_delivery_date: requestedDate.value || null, p_requested_delivery_time_from: requestedFrom.value || null, p_requested_delivery_time_to: requestedTo.value || null, p_confirmed_delivery_date: confirmedDate.value || null, p_confirmed_delivery_time_from: confirmedFrom.value || null, p_confirmed_delivery_time_to: confirmedTo.value || null, p_delivery_instructions: instructions.value.trim() || null, p_customer_note: note.value.trim() || null, p_lines: lineValues };
+      const operation = retry || { id: newUuid(), payload }; retry = operation; state.createBusy = true; submit.disabled = true; message(feedback, 'info', 'Създаване на поръчката…'); try { sessionStorage.setItem(adminCreateKey, JSON.stringify(operation)); const { data, error } = await supabase.rpc('create_admin_order', { p_request_id: operation.id, ...operation.payload }); if (error) throw error; sessionStorage.removeItem(adminCreateKey); retry = null; state.selectedOrderId = (Array.isArray(data) ? data[0] : data).order_id; await refreshOrdersAndSelection(); message(feedback, 'success', 'Поръчката е създадена и е отворена с резервите и недостига си.'); } catch (error) { message(feedback, 'danger', `Резултатът не е потвърден: ${translated(error)} Повторете същата заявка.`); } finally { state.createBusy = false; if (submit.isConnected) submit.disabled = false; } };
+    body.append(form); return panel;
+  }
+
   function renderList() {
     content.innerHTML = '<div class="row g-4"><section class="col-12 col-xl-5"><div class="admin-order-panel"><label class="form-label fw-semibold">Търсене</label><input class="form-control" data-search type="search" placeholder="Номер, салон или контакт"><label class="form-label fw-semibold mt-3">Статус</label><select class="form-select" data-filter><option value="">Всички</option><option>NEW</option><option>APPROVED</option><option>IN_PROGRESS</option><option>DENIED</option><option>DONE</option></select><div class="admin-order-list mt-3" data-list></div></div></section><section class="col-12 col-xl-7"><div class="admin-order-panel" data-detail><p class="text-body-secondary mb-0">Изберете поръчка.</p></div></section></div>';
     const list = content.querySelector('[data-list]'); const search = content.querySelector('[data-search]'); const filter = content.querySelector('[data-filter]');
+    list.parentElement.insertBefore(newOrderPanel(), list);
     search.value = state.searchQuery; filter.value = state.statusFilter;
     const draw = () => { list.replaceChildren(); const q = state.searchQuery.toLowerCase(); const rows = state.orders.filter((o) => (!state.statusFilter || o.status === state.statusFilter) && (!q || [o.order_number, o.salon_name_snapshot, o.contact_name_snapshot].join(' ').toLowerCase().includes(q))); if (!rows.length) list.append(createAlert('info', 'Няма поръчки по този филтър.')); rows.forEach((o) => { const b = e('button', 'admin-order-card text-start' + (state.selectedOrderId === o.id ? ' selected' : '')); b.type = 'button'; b.innerHTML = '<span class="badge text-bg-secondary">' + labels[o.status] + '</span><strong>№ ' + o.order_number + '</strong><span>' + blank(o.salon_name_snapshot || o.contact_name_snapshot) + '</span><small>' + blank(o.confirmed_delivery_date || o.requested_delivery_date) + '</small>'; const summary = productSummary(o.id); if (summary) b.append(e('small', 'admin-order-product-summary', summary)); b.onclick = () => load(o.id); list.append(b); }); };
     search.oninput = () => { state.searchQuery = search.value; draw(); }; filter.onchange = () => { state.statusFilter = filter.value; draw(); }; draw(); void refreshListSummaries(); return draw;
