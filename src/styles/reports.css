@@ -1,0 +1,98 @@
+.reports-shell {
+  margin: auto;
+  max-width: 52rem;
+}
+
+.reports-heading,
+.reports-panel,
+.reports-summary {
+  background: var(--salon-surface);
+  border: 1px solid var(--salon-border);
+  border-radius: 1rem;
+  box-shadow: 0 0.75rem 1.75rem rgb(var(--salon-primary-rgb) / 8%);
+  padding: 1.15rem;
+}
+
+.reports-content {
+  display: grid;
+  gap: 1rem;
+}
+
+.reports-presets {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.reports-presets .btn {
+  min-height: 2.75rem;
+  padding-inline: 0.35rem;
+}
+
+.reports-summary {
+  align-items: baseline;
+  background: var(--salon-soft-accent);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.reports-summary-label {
+  color: var(--salon-muted-ink);
+  font-weight: 600;
+}
+
+.reports-summary-value {
+  color: var(--salon-primary);
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.reports-loading {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.reports-product-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.reports-product-card {
+  background: rgb(var(--salon-primary-rgb) / 6%);
+  border: 1px solid var(--salon-border);
+  border-radius: 0.75rem;
+  padding: 0.85rem;
+}
+
+.reports-product-heading {
+  align-items: start;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.reports-product-heading h3 {
+  overflow-wrap: anywhere;
+}
+
+.reports-product-quantity {
+  color: var(--salon-primary);
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+@media (min-width: 576px) {
+  .reports-heading,
+  .reports-panel,
+  .reports-summary {
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .reports-presets {
+    grid-template-columns: 1fr;
+  }
+}

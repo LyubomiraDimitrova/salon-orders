@@ -16,6 +16,7 @@ export default defineConfig({
         adminProducts: fileURLToPath(new URL('./admin-products.html', import.meta.url)),
         adminOrders: fileURLToPath(new URL('./admin-orders.html', import.meta.url)),
         inventory: fileURLToPath(new URL('./inventory.html', import.meta.url)),
+        reports: fileURLToPath(new URL('./reports.html', import.meta.url)),
       },
     },
   },

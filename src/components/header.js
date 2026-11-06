@@ -58,6 +58,7 @@ function mountAccountNavigation(header, currentPage) {
       }
 
       if (profile.role === 'admin' && profile.approval_status === 'approved') {
+        group.prepend(createNavigationLink('Отчети', 'reports.html', currentPage === 'reports'));
         group.prepend(createNavigationLink('Поръчки', 'admin-orders.html', currentPage === 'admin-orders'));
         group.prepend(createNavigationLink('Наличности', 'inventory.html', currentPage === 'inventory'));
         group.prepend(createNavigationLink('Клиенти', 'admin.html', currentPage === 'admin'));
