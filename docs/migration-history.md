@@ -131,3 +131,17 @@ recorded as passed.
 The user confirmed the approved-administrator contact-editing workflow. This
 is a functional UI test only; authorization, session-loss handling, and
 network-failure or retry behavior have not been tested or recorded as passed.
+
+## 20261107140000 - Admin price-list deletion policy
+
+On 2026-11-07, this migration was manually applied through the reviewed
+Dashboard script
+`supabase/manual-apply-20261107140000_admin_price_lists_delete_policy.sql`.
+The committed migration SQL was not changed or reapplied locally.
+
+The user confirmed that the price-list section works after it was moved to the
+approved-administrator profile, and that deleting a PDF price list succeeds.
+These are user-confirmed functional tests only. Authorization and other
+security checks, network-failure and reconciliation behavior, and
+logout/access-loss modal-cleanup behavior have not been tested or recorded as
+passed.
