@@ -186,9 +186,9 @@ export function createCatalogPage() {
 
   async function refreshCatalogMode(session) {
     const version = ++adminCheckVersion;
-    showPublicCatalog();
 
     if (!isSupabaseConfigured) {
+      showPublicCatalog();
       return;
     }
 
@@ -196,13 +196,18 @@ export function createCatalogPage() {
     const activeSession = sessionResult.session;
     if (!activeSession?.user) {
       clientOrderingAccountId = null;
+      showPublicCatalog();
       renderProducts();
       return;
     }
 
     try {
       const adminProfile = await getApprovedAdminProfile(activeSession.user.id);
-      if (version !== adminCheckVersion || !adminProfile) {
+      if (version !== adminCheckVersion) {
+        return;
+      }
+      if (!adminProfile) {
+        showPublicCatalog();
         if (version === adminCheckVersion) {
           const { profile } = await loadOwnProfile(activeSession.user.id);
           clientOrderingAccountId = profile?.role === 'client'
@@ -222,7 +227,9 @@ export function createCatalogPage() {
       adminManagementPage ||= createAdminCatalogManagement();
       const managementPage = await adminManagementPage;
       if (version === adminCheckVersion) {
-        adminManagement.replaceChildren(managementPage);
+        if (adminManagement.firstChild !== managementPage) {
+          adminManagement.replaceChildren(managementPage);
+        }
       }
     } catch {
       if (version === adminCheckVersion) {

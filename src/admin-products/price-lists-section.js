@@ -64,6 +64,7 @@ export function createAdminPriceListsSection() {
       <label class="form-label fw-semibold" for="price-list-file">PDF ценови лист</label>
       <input class="form-control" id="price-list-file" name="priceList" type="file" accept="application/pdf,.pdf" aria-describedby="price-list-help" required />
       <div class="form-text" id="price-list-help">Изберете един PDF файл с размер до 10 MB.</div>
+      <div class="form-text fw-semibold mt-2" data-selected-price-list aria-live="polite">Няма избран файл.</div>
       <div class="d-grid mt-3"><button class="btn btn-primary" type="submit" data-upload-price-list>Качи ценови лист</button></div>
       <div class="mt-3" data-price-list-feedback aria-live="polite"></div>
     </form>
@@ -77,6 +78,7 @@ export function createAdminPriceListsSection() {
   const uploadButton = root.querySelector('[data-upload-price-list]');
   const feedback = root.querySelector('[data-price-list-feedback]');
   const filesContainer = root.querySelector('[data-price-list-files]');
+  const selectedFile = root.querySelector('[data-selected-price-list]');
   const state = {
     active: true,
     downloading: new Set(),
@@ -110,6 +112,13 @@ export function createAdminPriceListsSection() {
     fileInput.disabled = isBusy || Boolean(state.pendingUpload);
     uploadButton.disabled = isBusy || Boolean(state.pendingUpload);
     uploadButton.textContent = isBusy ? 'Качване…' : 'Качи ценови лист';
+  }
+
+  function renderSelectedFile() {
+    const file = fileInput.files?.[0];
+    selectedFile.textContent = file
+      ? 'Избран файл: ' + safeOriginalFilename(file.name) + ' (' + formatFileSize(file.size) + ')'
+      : 'Няма избран файл.';
   }
 
   function renderFiles() {
@@ -222,6 +231,7 @@ export function createAdminPriceListsSection() {
       if (!isCurrent(version)) return;
       state.pendingUpload = null;
       form.reset();
+      renderSelectedFile();
       showFeedback('success', `Ценовият лист „${pendingUpload.originalFilename}“ е качен.`);
       await load();
     } catch (error) {
@@ -261,6 +271,7 @@ export function createAdminPriceListsSection() {
       if ((data || []).length > 0) {
         state.pendingUpload = null;
         form.reset();
+        renderSelectedFile();
         showFeedback('success', `Ценовият лист „${pendingUpload.originalFilename}“ е качен.`);
         await load();
         return;
@@ -310,6 +321,7 @@ export function createAdminPriceListsSection() {
       originalFilename: safeOriginalFilename(file.name),
     });
   });
+  fileInput.addEventListener('change', renderSelectedFile);
 
   return {
     clear() {

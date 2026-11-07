@@ -98,3 +98,16 @@ The user reported testing the Bootstrap product-deletion confirmation modal
 and successfully deleting an unused test product. This is a user-reported UI
 test only; deferred rollback and security tests have not been recorded as
 passed.
+
+## 20261107100000 - Admin price-list storage
+
+On 2026-11-07, this migration was manually applied through the reviewed
+Dashboard script
+`supabase/manual-apply-20261107100000_admin_price_lists_storage.sql`.
+The user confirmed that selecting a PDF, uploading it, and downloading the
+uploaded price list work.
+
+This is a user-confirmed functional workflow test only. Authorization for
+non-admin users, the 10 MB size limit, and network-retry handling have not
+been tested or recorded as passed. The committed migration SQL was not changed
+or reapplied locally.

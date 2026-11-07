@@ -59,6 +59,7 @@ export async function createAdminCatalogManagement() {
     products: [],
     saveFailed: false,
     saveQueue: Promise.resolve(),
+    activeAdminUserId: null,
     version: 0,
     brands: [],
   };
@@ -82,6 +83,7 @@ export async function createAdminCatalogManagement() {
   function clearProtected(message, type = 'warning') {
     priceListsSection?.clear();
     priceListsSection = null;
+    state.activeAdminUserId = null;
     state.version += 1;
     state.draftContext += 1;
     window.clearTimeout(state.autosaveTimer);
@@ -959,9 +961,13 @@ export async function createAdminCatalogManagement() {
 
   async function load(session) {
     const version = ++state.version;
-    priceListsSection?.clear();
-    priceListsSection = null;
-    content.replaceChildren(createAlert('info', 'Проверка на администраторския достъп…'));
+    const canPreserveWorkspace = state.activeAdminUserId === session.user.id
+      && Boolean(content.querySelector('.admin-products-shell'));
+    if (!canPreserveWorkspace) {
+      priceListsSection?.clear();
+      priceListsSection = null;
+      content.replaceChildren(createAlert('info', 'Проверка на администраторския достъп…'));
+    }
     try {
       const profile = await getApprovedAdminProfile(session.user.id);
       if (version !== state.version) return;
@@ -969,6 +975,7 @@ export async function createAdminCatalogManagement() {
         clearProtected('Тази страница е достъпна само за одобрени администратори.');
         return;
       }
+      if (canPreserveWorkspace) return;
       content.replaceChildren(createAlert('info', 'Зареждане на каталога…'));
       const [products, brands, categories, prices] = await Promise.all([
         supabase.from('products').select(productFields).order('name'),
@@ -983,6 +990,7 @@ export async function createAdminCatalogManagement() {
       state.brands = brands.data || [];
       state.categories = categories.data || [];
       state.prices = new Map((prices.data || []).map((price) => [String(price.product_id), price]));
+      state.activeAdminUserId = session.user.id;
       renderWorkspace();
     } catch (error) {
       if (version === state.version) clearProtected(messageOf(error, 'Каталогът не можа да бъде зареден. Опитайте отново по-късно.'), 'danger');
