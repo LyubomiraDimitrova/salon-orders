@@ -111,3 +111,23 @@ This is a user-confirmed functional workflow test only. Authorization for
 non-admin users, the 10 MB size limit, and network-retry handling have not
 been tested or recorded as passed. The committed migration SQL was not changed
 or reapplied locally.
+
+## 20261107130000 - Admin sales category reporting
+
+On 2026-11-07, this migration was manually applied through the reviewed
+Dashboard script
+`supabase/manual-apply-20261107130000_admin_sales_category_reporting.sql`.
+The committed migration SQL was not changed or reapplied locally.
+
+The user confirmed a category-report functional test for a selected period:
+the total was 6 sold units, the product breakdown was 3 + 2 + 1, and the
+category breakdown was 3 + 3. This is a user-confirmed functional test only.
+Authorization and security checks, date-boundary cases, stale-response
+handling, and retry or network-failure behavior have not been tested or
+recorded as passed.
+
+## Administrator profile editing
+
+The user confirmed the approved-administrator contact-editing workflow. This
+is a functional UI test only; authorization, session-loss handling, and
+network-failure or retry behavior have not been tested or recorded as passed.
