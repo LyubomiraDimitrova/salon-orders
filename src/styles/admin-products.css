@@ -139,10 +139,19 @@
   overflow-wrap: anywhere;
 }
 
+.admin-price-list-actions {
+  display: grid;
+  gap: 0.5rem;
+}
+
 @media (min-width: 576px) {
   .admin-price-list-file {
     align-items: center;
     grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .admin-price-list-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .admin-price-list-file .btn {
