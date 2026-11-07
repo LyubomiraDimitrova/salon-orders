@@ -69,6 +69,24 @@
   overflow-wrap: anywhere;
 }
 
+.admin-product-heading {
+  align-items: center;
+  display: flex;
+  flex: 1 1 auto;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.admin-product-heading h3 {
+  min-width: 0;
+}
+
+.admin-product-category-icon {
+  flex: 0 0 30px;
+  height: 30px;
+  width: 30px;
+}
+
 .admin-recommended-badge {
   background-color: var(--salon-rose);
   color: var(--salon-surface);

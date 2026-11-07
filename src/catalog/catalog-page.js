@@ -4,6 +4,7 @@ import { getApprovedAdminProfile } from '../services/admin-access.js';
 import { isSupabaseConfigured } from '../services/supabase-client.js';
 import { createAdminCatalogManagement } from '../admin-products/admin-products-page.js';
 import { addProductToClientCart } from '../orders/client-order-store.js';
+import { getCategoryIllustration } from './category-illustrations.js';
 
 function createElement(tagName, className, text) {
   const element = document.createElement(tagName);
@@ -51,21 +52,29 @@ function getSafeImageUrl(imagePath) {
   }
 }
 
-function createImage(productName, imagePath) {
-  const placeholder = createElement('div', 'catalog-image-placeholder', 'Изображение');
-  placeholder.setAttribute('aria-label', `Липсва изображение за ${productName}`);
+function createCategoryIllustration(categoryName) {
+  const illustration = document.createElement('img');
+  illustration.className = 'catalog-category-illustration';
+  illustration.src = getCategoryIllustration(categoryName);
+  illustration.alt = '';
+  illustration.setAttribute('aria-hidden', 'true');
+  return illustration;
+}
+
+function createImage(imagePath, categoryName) {
+  const illustration = createCategoryIllustration(categoryName);
   const safeImageUrl = getSafeImageUrl(imagePath);
 
   if (!safeImageUrl) {
-    return placeholder;
+    return illustration;
   }
 
   const image = document.createElement('img');
   image.className = 'catalog-product-image';
   image.src = safeImageUrl;
-  image.alt = productName;
+  image.alt = '';
   image.loading = 'lazy';
-  image.addEventListener('error', () => image.replaceWith(placeholder), { once: true });
+  image.addEventListener('error', () => image.replaceWith(illustration), { once: true });
   return image;
 }
 
@@ -78,7 +87,7 @@ function createProductCard(product, brandName, categoryName, onAddToCart) {
   const detailDisclosure = document.createElement('details');
   const detailsSummary = createElement('summary', 'catalog-details-summary', 'Детайли');
 
-  media.append(createImage(product.name, product.image_path));
+  media.append(createImage(product.image_path, categoryName));
 
   if (product.is_recommended) {
     media.append(createElement('span', 'badge catalog-recommended-badge', 'Препоръчан'));
@@ -182,6 +191,17 @@ export function createCatalogPage() {
     filters.hidden = false;
     summary.hidden = false;
     content.hidden = false;
+  }
+
+  function showCatalogModePending() {
+    adminManagement.replaceChildren(createElement(
+      'p',
+      'catalog-mode-status text-body-secondary mb-4',
+      'Проверка на достъпа до каталога…',
+    ));
+    filters.hidden = true;
+    summary.hidden = true;
+    content.hidden = true;
   }
 
   async function refreshCatalogMode(session) {
@@ -349,6 +369,7 @@ export function createCatalogPage() {
 
   container.append(heading, introduction, adminManagement, filters, summary, content);
   main.append(container);
+  showCatalogModePending();
   void refreshCatalogMode();
   subscribeToSessionChanges((_event, session) => {
     void refreshCatalogMode(session);

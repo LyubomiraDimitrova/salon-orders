@@ -3,6 +3,7 @@ import { Modal } from 'bootstrap';
 import { getApprovedAdminProfile } from '../services/admin-access.js';
 import { isSupabaseConfigured, supabase } from '../services/supabase-client.js';
 import { createAdminPriceListsSection } from './price-lists-section.js';
+import { getCategoryIllustration } from '../catalog/category-illustrations.js';
 
 const productFields = 'id, brand_id, category_id, article_code, series_name, name, description, size_label, shade_number, shade_name, shade_color, developer_concentration, image_path, is_hidden, is_recommended, updated_at';
 const priceFormatter = new Intl.NumberFormat('bg-BG', { style: 'currency', currency: 'EUR' });
@@ -427,10 +428,19 @@ export async function createAdminCatalogManagement() {
       records.forEach((product) => {
         const card = el('article', 'admin-product-card');
         const header = el('div', 'd-flex align-items-start justify-content-between gap-2');
+        const heading = el('div', 'admin-product-heading');
+        const illustration = document.createElement('img');
         const button = el('button', 'btn btn-sm btn-outline-primary flex-shrink-0', 'Отвори');
+        illustration.className = 'admin-product-category-icon';
+        illustration.src = getCategoryIllustration(categoryNames.get(String(product.category_id)));
+        illustration.alt = '';
+        illustration.width = 30;
+        illustration.height = 30;
+        illustration.setAttribute('aria-hidden', 'true');
         button.type = 'button';
         button.addEventListener('click', () => editProduct(product.id));
-        header.append(el('h3', 'h6 mb-1', product.name), button);
+        heading.append(illustration, el('h3', 'h6 mb-1', product.name));
+        header.append(heading, button);
         card.append(header, el('p', 'small text-body-secondary mb-2', [brandNames.get(String(product.brand_id)), categoryNames.get(String(product.category_id)), product.size_label].filter(Boolean).join(' · ') || 'Непълна чернова'));
         const badges = el('div', 'd-flex flex-wrap gap-2');
         badges.append(el('span', `badge text-bg-${product.is_hidden ? 'secondary' : 'success'}`, product.is_hidden ? 'Скрита чернова' : 'Публикуван'));
