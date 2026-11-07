@@ -51,6 +51,7 @@ export async function createAdminCatalogManagement() {
     draftContext: 0,
     isNewDraft: false,
     prices: new Map(),
+    deletingProductId: null,
     productDirty: false,
     products: [],
     saveFailed: false,
@@ -143,7 +144,7 @@ export async function createAdminCatalogManagement() {
           </div>
           <fieldset class="product-price-box mt-4"><legend class="h5 mb-1">Цена</legend><p class="text-body-secondary small mb-3">Цените са видими само за одобрени администратори. Въведете крайна цена с ДДС в EUR.</p><div class="row g-3"><div class="col-12 col-md-4"><label class="form-label fw-semibold" for="retail-price">Крайна цена (EUR)</label><input class="form-control" id="retail-price" name="retail" inputmode="decimal" placeholder="напр. 12,50" /></div><div class="col-6 col-md-4"><label class="form-label fw-semibold" for="salon-price">Салонна цена</label><input class="form-control" id="salon-price" name="salon" readonly value="—" /></div><div class="col-6 col-md-4"><label class="form-label fw-semibold" for="reference-price">Референтна цена</label><input class="form-control" id="reference-price" name="reference" readonly value="—" /></div></div></fieldset>
           <div class="d-flex flex-wrap gap-3 mt-4"><div data-draft-visibility-status class="form-text fw-semibold">Скрит продукт — не се показва в каталога.</div><div data-hidden-product-control><div class="form-check"><input class="form-check-input" id="hidden-product" name="hidden" type="checkbox" /><label class="form-check-label" for="hidden-product">Скрит продукт</label></div><div class="form-text ms-4">Не се показва в публичния каталог.</div></div><div class="form-check"><input class="form-check-input" id="recommended-product" name="recommended" type="checkbox" /><label class="form-check-label" for="recommended-product">Препоръчан</label></div></div>
-          <p class="form-text mt-2 mb-0">За публикуване са нужни марка, категория, разфасовка и валидна крайна цена.</p><div class="d-grid gap-2 mt-4"><button class="btn btn-primary" type="submit">Запази промените</button><button class="btn btn-outline-primary" type="button" data-save-draft>Запази чернова</button><button class="btn btn-outline-success" type="button" data-publish-product>Публикувай</button></div>
+          <p class="form-text mt-2 mb-0">За публикуване са нужни марка, категория, разфасовка и валидна крайна цена.</p><div class="d-grid gap-2 mt-4"><button class="btn btn-primary" type="submit">Запази промените</button><button class="btn btn-outline-primary" type="button" data-save-draft>Запази чернова</button><button class="btn btn-outline-success" type="button" data-publish-product>Публикувай</button><button class="btn btn-outline-danger" type="button" data-delete-product hidden>Изтрий продукта</button></div>
         </form></section>
       </div>`;
     return root;
@@ -286,6 +287,7 @@ export async function createAdminCatalogManagement() {
       const publishButton = root.querySelector('[data-publish-product]');
       publishButton.disabled = !product.is_hidden;
       publishButton.textContent = product.is_hidden ? 'Публикувай' : 'Публикуван';
+      root.querySelector('[data-delete-product]').hidden = false;
     }
 
     function resetProduct() {
@@ -302,6 +304,7 @@ export async function createAdminCatalogManagement() {
       const publishButton = root.querySelector('[data-publish-product]');
       publishButton.disabled = false;
       publishButton.textContent = 'Публикувай';
+      root.querySelector('[data-delete-product]').hidden = true;
       formMessage.replaceChildren();
       fillProductSelects();
       setPrice(null);
@@ -721,6 +724,93 @@ export async function createAdminCatalogManagement() {
       if (!automatic) setBusy(productForm, actionButton, false, 'Запазване…');
     }
 
+    function deletionFailureMessage(error) {
+      const detail = error?.message || '';
+      const blockerLabels = {
+        'order lines': 'редове в поръчки, включително архивни редове',
+        'stock levels': 'въведена наличност',
+        'stock movements': 'движения на наличност',
+        'stock reservations': 'резервации',
+      };
+      const match = detail.match(/references in (.+)\. Hide the product instead\./);
+      if (match) {
+        const blockers = match[1]
+          .split(', ')
+          .map((blocker) => blockerLabels[blocker] || blocker)
+          .join(', ');
+        return `Продуктът не може да бъде изтрит, защото има ${blockers}. Използвайте „Скрит продукт“ вместо това.`;
+      }
+      if (error?.code === '42501') {
+        return 'Само одобрен администратор може да изтрие продукт.';
+      }
+      if (detail.includes('Product confirmation does not match')) {
+        return 'Името на продукта е променено. Каталогът не е променен; обновете го и потвърдете отново.';
+      }
+      if (error?.code === '23503' && detail.includes('does not exist')) {
+        return 'Продуктът вече не съществува. Обновете каталога.';
+      }
+      return 'Продуктът не беше изтрит. Данните в редактора са запазени; опитайте отново.';
+    }
+
+    async function refreshProductsAfterDeletion() {
+      const [products, prices] = await Promise.all([
+        supabase.from('products').select(productFields).order('name'),
+        supabase.rpc('get_admin_product_prices'),
+      ]);
+      const failed = [products, prices].find((result) => result.error);
+      if (failed) throw failed.error;
+      state.products = products.data || [];
+      state.prices = new Map((prices.data || []).map((price) => [String(price.product_id), price]));
+      renderList();
+    }
+
+    async function deleteProduct() {
+      const productId = productForm.elements.id.value;
+      const product = state.products.find((item) => String(item.id) === String(productId));
+      const deleteButton = root.querySelector('[data-delete-product]');
+      if (!product || state.deletingProductId) return;
+
+      const confirmation = window.prompt(
+        `Това ще изтрие окончателно продукта „${product.name}“. Въведете точно името му, за да потвърдите:`,
+        '',
+      );
+      if (confirmation === null) return;
+      if (confirmation !== product.name) {
+        formMessage.replaceChildren(createAlert('warning', 'Името не съвпада. Продуктът не е изтрит.'));
+        return;
+      }
+
+      state.deletingProductId = String(product.id);
+      setBusy(productForm, deleteButton, true, 'Изтриване…');
+      formMessage.replaceChildren(createAlert('info', 'Проверка на продукта и изтриване…'));
+      try {
+        const { error } = await supabase.rpc('delete_admin_product', {
+          p_product_id: product.id,
+          p_confirmed_product_name: confirmation,
+        });
+        if (error) throw error;
+
+        state.products = state.products.filter((item) => String(item.id) !== String(product.id));
+        state.prices.delete(String(product.id));
+        window.clearTimeout(state.autosaveTimer);
+        state.autosaveTimer = null;
+        resetProduct();
+        renderList();
+
+        try {
+          await refreshProductsAfterDeletion();
+          formMessage.replaceChildren(createAlert('success', `Продуктът „${product.name}“ е изтрит окончателно и каталогът е обновен.`));
+        } catch (_refreshError) {
+          formMessage.replaceChildren(createAlert('warning', `Продуктът „${product.name}“ е изтрит окончателно. Редакторът е изчистен, но каталогът не можа да се обнови; обновете страницата.`));
+        }
+      } catch (error) {
+        formMessage.replaceChildren(createAlert('warning', deletionFailureMessage(error)));
+      } finally {
+        state.deletingProductId = null;
+        setBusy(productForm, deleteButton, false, 'Изтриване…');
+      }
+    }
+
     function queueNewDraftSave(options = {}) {
       const context = options.context ?? state.draftContext;
       const run = () => saveProductWorkflow({ ...options, context });
@@ -745,6 +835,7 @@ export async function createAdminCatalogManagement() {
     closeEditorButton.addEventListener('click', closeEditor);
     root.querySelector('[data-save-draft]').addEventListener('click', () => { queueNewDraftSave({ draftOnly: true }); });
     root.querySelector('[data-publish-product]').addEventListener('click', () => { queueNewDraftSave({ publish: true }); });
+    root.querySelector('[data-delete-product]').addEventListener('click', () => { void deleteProduct(); });
     productForm.addEventListener('submit', (event) => {
       event.preventDefault();
       queueNewDraftSave();
