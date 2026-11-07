@@ -228,7 +228,7 @@ export async function createAdminCatalogManagement() {
     const brandFilter = document.createElement('select');
     const categoryFilter = document.createElement('select');
     const recommendedFilter = document.createElement('input');
-    const clearFiltersButton = el('button', 'btn btn-outline-primary w-100', 'Изчисти филтрите');
+    const clearFiltersButton = el('button', 'btn btn-outline-primary admin-clear-filters', 'Изчисти всичко');
 
     function createListFilter(id, label, control) {
       const field = el('div', 'col-12 col-md-6 col-xl-2');
@@ -255,7 +255,7 @@ export async function createAdminCatalogManagement() {
 
     search.closest('.col-12').className = 'col-12 col-lg-6 col-xl-3';
     visibility.closest('.col-12').className = 'col-12 col-md-4 col-xl-2';
-    const clearFiltersField = el('div', 'col-12 col-xl-1 d-flex align-items-end');
+    const clearFiltersField = el('div', 'col-12 col-xl-auto d-flex align-items-end');
     clearFiltersButton.type = 'button';
     clearFiltersField.append(clearFiltersButton);
     filterRow.append(

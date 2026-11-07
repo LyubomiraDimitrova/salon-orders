@@ -143,16 +143,18 @@ function matchesSearch(product, query) {
 }
 
 export function createCatalogPage() {
+  const visitorIntroduction = 'Разгледайте професионални продукти, подбрани за вашата грижа.';
+  const adminIntroduction = 'Разгледай като админ';
   const main = createElement('main', 'catalog-page py-5');
   const container = createElement('div', 'container');
   const heading = createElement('h1', 'display-5 fw-bold mb-3', 'Каталог');
-  const introduction = createElement('p', 'lead text-body-secondary mb-4', 'Разгледайте професионални продукти, подбрани за вашата грижа.');
+  const introduction = createElement('p', 'lead text-body-secondary mb-4', visitorIntroduction);
   const adminManagement = createElement('section', 'catalog-admin-management-slot');
   const filters = createElement('form', 'catalog-filters row g-3 align-items-end mb-4');
   const searchInput = document.createElement('input');
   const brandSelect = document.createElement('select');
   const categorySelect = document.createElement('select');
-  const clearButton = createElement('button', 'btn btn-outline-primary w-100 catalog-clear-filters', 'Изчисти филтрите');
+  const clearButton = createElement('button', 'btn btn-outline-primary catalog-clear-filters', 'Изчисти всичко');
   const summary = createElement('p', 'catalog-summary mb-4', '');
   const content = createElement('section', 'catalog-content');
 
@@ -172,7 +174,7 @@ export function createCatalogPage() {
     ['col-12 col-lg-4', createLabel('Търсене', searchInput), searchInput],
     ['col-12 col-md-5 col-lg-3', createLabel('Марка', brandSelect), brandSelect],
     ['col-12 col-md-5 col-lg-3', createLabel('Категория', categorySelect), categorySelect],
-    ['col-12 col-lg-2', createElement('span', 'visually-hidden', 'Филтри'), clearButton],
+    ['col-12 col-lg-auto', createElement('span', 'visually-hidden', 'Филтри'), clearButton],
   ].forEach(([columnClass, label, control]) => {
     const field = createElement('div', columnClass);
     field.append(label, control);
@@ -186,7 +188,13 @@ export function createCatalogPage() {
 
   let adminManagementPage = null;
 
+  function setIntroduction(text) {
+    introduction.textContent = text;
+    introduction.hidden = false;
+  }
+
   function showPublicCatalog() {
+    setIntroduction(visitorIntroduction);
     adminManagement.replaceChildren();
     filters.hidden = false;
     summary.hidden = false;
@@ -194,6 +202,7 @@ export function createCatalogPage() {
   }
 
   function showCatalogModePending() {
+    introduction.hidden = true;
     adminManagement.replaceChildren(createElement(
       'p',
       'catalog-mode-status text-body-secondary mb-4',
@@ -206,6 +215,7 @@ export function createCatalogPage() {
 
   async function refreshCatalogMode(session) {
     const version = ++adminCheckVersion;
+    introduction.hidden = true;
 
     if (!isSupabaseConfigured) {
       showPublicCatalog();
@@ -213,6 +223,9 @@ export function createCatalogPage() {
     }
 
     const sessionResult = session === undefined ? await getSession() : { session };
+    if (version !== adminCheckVersion) {
+      return;
+    }
     const activeSession = sessionResult.session;
     if (!activeSession?.user) {
       clientOrderingAccountId = null;
@@ -241,6 +254,7 @@ export function createCatalogPage() {
       }
 
       clientOrderingAccountId = null;
+      setIntroduction(adminIntroduction);
       filters.hidden = true;
       summary.hidden = true;
       content.hidden = true;

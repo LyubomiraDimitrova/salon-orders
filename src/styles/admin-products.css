@@ -109,6 +109,17 @@
   min-height: 2.9rem;
 }
 
+.admin-clear-filters {
+  width: 100%;
+  white-space: nowrap;
+}
+
+@media (min-width: 1200px) {
+  .admin-clear-filters {
+    width: auto;
+  }
+}
+
 .admin-price-list-files {
   display: grid;
   gap: 0.75rem;

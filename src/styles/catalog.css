@@ -124,7 +124,14 @@
 }
 
 .catalog-clear-filters {
+  width: 100%;
   white-space: nowrap;
+}
+
+@media (min-width: 992px) {
+  .catalog-clear-filters {
+    width: auto;
+  }
 }
 
 @media (max-width: 575.98px) {

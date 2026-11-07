@@ -129,6 +129,31 @@ textarea {
   border: 1px solid var(--salon-border);
 }
 
+.admin-home-actions {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr;
+}
+
+.admin-home-feature-link {
+  color: inherit;
+  display: block;
+  text-decoration: none;
+  transition: box-shadow 150ms ease, transform 150ms ease;
+}
+
+.admin-home-feature-link:hover {
+  box-shadow: 0 0.75rem 1.5rem rgb(var(--salon-primary-rgb) / 18%);
+  color: inherit;
+  transform: translateY(-0.15rem);
+}
+
+.admin-home-feature-link:focus-visible {
+  box-shadow: 0 0 0 0.25rem var(--salon-focus-ring);
+  color: inherit;
+  outline: none;
+}
+
 .text-body-secondary {
   color: var(--salon-muted-ink) !important;
 }
@@ -198,5 +223,11 @@ a:hover {
   .py-lg-6 {
     padding-bottom: 5rem !important;
     padding-top: 5rem !important;
+  }
+}
+
+@media (min-width: 576px) {
+  .admin-home-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
