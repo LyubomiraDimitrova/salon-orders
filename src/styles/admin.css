@@ -19,6 +19,22 @@
   padding: 1.25rem;
 }
 
+.admin-page-heading-content {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.admin-heading-actions {
+  flex: 0 0 auto;
+}
+
+.admin-add-salon-button {
+  min-height: 2.9rem;
+  white-space: nowrap;
+}
+
 .admin-list-controls {
   max-width: 24rem;
 }
@@ -85,5 +101,16 @@
 
   .admin-client-actions .btn {
     flex-grow: 0 !important;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .admin-page-heading-content {
+    flex-direction: column;
+  }
+
+  .admin-heading-actions,
+  .admin-add-salon-button {
+    width: 100%;
   }
 }
