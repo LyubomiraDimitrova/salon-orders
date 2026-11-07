@@ -1,0 +1,54 @@
+.admin-price-lists {
+  background-color: var(--salon-surface);
+  border: 1px solid var(--salon-border);
+  border-radius: 1rem;
+  box-shadow: 0 0.75rem 1.75rem rgb(var(--salon-primary-rgb) / 8%);
+  padding: 1.25rem;
+}
+
+.admin-price-lists .btn {
+  min-height: 2.9rem;
+}
+
+.admin-price-list-files {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.admin-price-list-file {
+  display: grid;
+  gap: 0.85rem;
+  background-color: var(--salon-soft-accent);
+  border: 1px solid var(--salon-border);
+  border-radius: 0.75rem;
+  padding: 0.85rem;
+}
+
+.admin-price-list-file h4,
+.admin-price-list-file p {
+  overflow-wrap: anywhere;
+}
+
+.admin-price-list-actions {
+  display: grid;
+  gap: 0.5rem;
+}
+
+@media (min-width: 576px) {
+  .admin-price-lists {
+    padding: 1.5rem;
+  }
+
+  .admin-price-list-file {
+    align-items: center;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .admin-price-list-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-price-list-file .btn {
+    min-width: 9.5rem;
+  }
+}

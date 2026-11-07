@@ -51,7 +51,7 @@ function isUncertainStorageError(error) {
 
 export function createAdminPriceListsSection() {
   const root = document.createElement('section');
-  root.className = 'admin-products-panel admin-price-lists mt-4';
+  root.className = 'admin-price-lists mt-4';
   root.setAttribute('aria-labelledby', 'price-lists-title');
   root.innerHTML = `
     <div class="d-flex flex-wrap justify-content-between gap-2 mb-3">

@@ -8,6 +8,7 @@ import {
   updateOwnSalonContact,
 } from './auth-helpers.js';
 import { createAuthPageLayout, createFormField } from './auth-page-layout.js';
+import { createAdminPriceListsSection } from '../admin-products/price-lists-section.js';
 import { isSupabaseConfigured } from '../services/supabase-client.js';
 
 const approvalMessages = {
@@ -294,8 +295,18 @@ export async function createProfilePage() {
   }
 
   const state = { accountId: null, adminDraft: null, editingAdmin: false, profile: null, salonClient: null, savingAdmin: false, version: 0 };
+  let priceListsSection = null;
   const isApprovedAdmin = (profile) => profile?.role === 'admin' && profile.approval_status === 'approved';
-  const clearProtectedState = () => { state.accountId = null; state.adminDraft = null; state.editingAdmin = false; state.profile = null; state.salonClient = null; state.savingAdmin = false; };
+  const clearProtectedState = () => {
+    priceListsSection?.clear();
+    priceListsSection = null;
+    state.accountId = null;
+    state.adminDraft = null;
+    state.editingAdmin = false;
+    state.profile = null;
+    state.salonClient = null;
+    state.savingAdmin = false;
+  };
 
   function showSignedOutState() {
     clearProtectedState();
@@ -312,50 +323,57 @@ export async function createProfilePage() {
 
   function renderAdminProfile(userEmail, message) {
     setAdminHeading();
+    const workspace = document.createElement('div');
+    workspace.className = 'admin-profile-workspace';
     if (!state.editingAdmin) {
-      content.replaceChildren(createAdminReadOnlyProfile(state.profile, state.salonClient, userEmail, () => {
+      workspace.append(createAdminReadOnlyProfile(state.profile, state.salonClient, userEmail, () => {
         state.editingAdmin = true;
         state.adminDraft = null;
         renderAdminProfile(userEmail);
       }, message));
-      return;
+    } else {
+      const form = createAdminContactEditForm(state.salonClient, state.adminDraft, {
+        onDraft: (draft) => { state.adminDraft = draft; },
+        onCancel: () => { state.editingAdmin = false; state.adminDraft = null; renderAdminProfile(userEmail); },
+        onSave: async (draft, controls) => {
+          if (state.savingAdmin) return;
+          const accountId = state.accountId;
+          state.savingAdmin = true;
+          state.adminDraft = draft;
+          setFormBusy(controls.form, controls.save, true, 'Запазване…');
+          controls.address.disabled = true;
+          try {
+            const savedContact = await updateOwnSalonContact(state.profile.salon_client_id, {
+              contact_name: draft.contact_name.trim(),
+              phone: draft.phone.trim(),
+              email: draft.email.trim(),
+              address: draft.address.trim() || null,
+            });
+            if (state.accountId !== accountId || !isApprovedAdmin(state.profile)) return;
+            state.salonClient = savedContact;
+            state.adminDraft = null;
+            state.editingAdmin = false;
+            renderAdminProfile(userEmail, 'Данните за контакт са запазени.');
+          } catch (error) {
+            controls.feedback.append(createAlert('danger', getAuthErrorMessage(error, 'Данните не можаха да бъдат запазени. Опитайте отново.')));
+          } finally {
+            state.savingAdmin = false;
+            if (controls.form.isConnected) {
+              setFormBusy(controls.form, controls.save, false, 'Запазване…');
+              controls.cancel.disabled = false;
+              controls.address.disabled = false;
+            }
+          }
+        },
+      });
+      workspace.append(form);
     }
 
-    const form = createAdminContactEditForm(state.salonClient, state.adminDraft, {
-      onDraft: (draft) => { state.adminDraft = draft; },
-      onCancel: () => { state.editingAdmin = false; state.adminDraft = null; renderAdminProfile(userEmail); },
-      onSave: async (draft, controls) => {
-        if (state.savingAdmin) return;
-        const accountId = state.accountId;
-        state.savingAdmin = true;
-        state.adminDraft = draft;
-        setFormBusy(controls.form, controls.save, true, 'Запазване…');
-        controls.address.disabled = true;
-        try {
-          const savedContact = await updateOwnSalonContact(state.profile.salon_client_id, {
-            contact_name: draft.contact_name.trim(),
-            phone: draft.phone.trim(),
-            email: draft.email.trim(),
-            address: draft.address.trim() || null,
-          });
-          if (state.accountId !== accountId || !isApprovedAdmin(state.profile)) return;
-          state.salonClient = savedContact;
-          state.adminDraft = null;
-          state.editingAdmin = false;
-          renderAdminProfile(userEmail, 'Данните за контакт са запазени.');
-        } catch (error) {
-          controls.feedback.append(createAlert('danger', getAuthErrorMessage(error, 'Данните не можаха да бъдат запазени. Опитайте отново.')));
-        } finally {
-          state.savingAdmin = false;
-          if (controls.form.isConnected) {
-            setFormBusy(controls.form, controls.save, false, 'Запазване…');
-            controls.cancel.disabled = false;
-            controls.address.disabled = false;
-          }
-        }
-      },
-    });
-    content.replaceChildren(form);
+    const createdPriceListsSection = !priceListsSection;
+    priceListsSection ||= createAdminPriceListsSection();
+    workspace.append(priceListsSection.element);
+    content.replaceChildren(workspace);
+    if (createdPriceListsSection) void priceListsSection.load();
   }
 
   async function loadProfile(sessionOverride, { preserveAdminWorkspace = false } = {}) {
@@ -373,7 +391,8 @@ export async function createProfilePage() {
 
     const version = ++state.version;
     const sameAccount = state.accountId === session.user.id;
-    if (!(preserveAdminWorkspace && sameAccount && state.editingAdmin)) content.replaceChildren(createAlert('info', 'Зареждане на профила…'));
+    const canPreserveAdminWorkspace = preserveAdminWorkspace && sameAccount && Boolean(priceListsSection);
+    if (!canPreserveAdminWorkspace) content.replaceChildren(createAlert('info', 'Зареждане на профила…'));
 
     try {
       const { profile, salonClient } = await loadOwnProfile(session.user.id);
@@ -391,7 +410,7 @@ export async function createProfilePage() {
         state.accountId = session.user.id;
         state.profile = profile;
         state.salonClient = salonClient;
-        if (preserveAdminWorkspace && sameAccount && state.editingAdmin) return;
+        if (canPreserveAdminWorkspace) return;
         renderAdminProfile(session.user.email);
         return;
       }
@@ -425,7 +444,7 @@ export async function createProfilePage() {
       }
     } catch (error) {
       if (version !== state.version) return;
-      if (preserveAdminWorkspace && sameAccount && state.editingAdmin) return;
+      if (canPreserveAdminWorkspace) return;
       clearProtectedState();
       setClientHeading();
       content.replaceChildren(createAlert('danger', getAuthErrorMessage(error, 'Профилът не можа да бъде зареден. Опитайте отново.')));
