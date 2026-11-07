@@ -54,12 +54,14 @@
   gap: 0.75rem;
 }
 
-.reports-product-list {
+.reports-product-list,
+.reports-category-list {
   display: grid;
   gap: 0.65rem;
 }
 
-.reports-product-card {
+.reports-product-card,
+.reports-category-card {
   background: rgb(var(--salon-primary-rgb) / 6%);
   border: 1px solid var(--salon-border);
   border-radius: 0.75rem;

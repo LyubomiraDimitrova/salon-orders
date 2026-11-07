@@ -81,6 +81,7 @@ export async function createReportsPage() {
   const content = main.querySelector('.reports-content');
   const state = {
     activePreset: 'month',
+    categories: [],
     endDate: '',
     loadVersion: 0,
     products: [],
@@ -93,6 +94,7 @@ export async function createReportsPage() {
 
   function clearProtected(message, type = 'warning') {
     state.loadVersion += 1;
+    state.categories = [];
     state.products = [];
     state.totalUnits = null;
     state.status = 'protected';
@@ -127,6 +129,35 @@ export async function createReportsPage() {
       card.append(heading);
       const details = productDetails(product);
       if (details.length) card.append(element('p', 'text-body-secondary small mb-0', details.join(' · ')));
+      list.append(card);
+    });
+    panel.append(list);
+  }
+
+  function renderCategoryList(panel) {
+    const title = element('h2', 'h5 mb-3', 'Продадени бройки по категории');
+    panel.append(title);
+
+    if (!state.categories.length) {
+      panel.append(createAlert('info', 'Няма продадени бройки по категории за избрания период.'));
+      return;
+    }
+
+    const list = element('div', 'reports-category-list');
+    const categories = [...state.categories].sort((first, second) => (
+      Number(second.units_sold) - Number(first.units_sold)
+      || String(first.category_name || 'Без категория').localeCompare(String(second.category_name || 'Без категория'), 'bg')
+    ));
+
+    categories.forEach((category) => {
+      const card = element('article', 'reports-category-card');
+      const heading = element('div', 'reports-product-heading');
+      const name = category.category_name?.trim() || 'Без категория';
+      heading.append(
+        element('h3', 'h6 mb-0', name),
+        element('strong', 'reports-product-quantity', `${numberFormatter.format(Number(category.units_sold))} бр.`),
+      );
+      card.append(heading);
       list.append(card);
     });
     panel.append(list);
@@ -210,6 +241,9 @@ export async function createReportsPage() {
       const products = element('section', 'reports-panel');
       renderProductList(products);
       content.append(products);
+      const categories = element('section', 'reports-panel');
+      renderCategoryList(categories);
+      content.append(categories);
     }
   }
 
@@ -225,17 +259,20 @@ export async function createReportsPage() {
     renderWorkspace();
 
     try {
-      const [summaryResponse, productsResponse] = await Promise.all([
+      const [summaryResponse, productsResponse, categoriesResponse] = await Promise.all([
         supabase.rpc('get_admin_sales_units_summary', { p_start_date: state.startDate, p_end_date: state.endDate }),
         supabase.rpc('get_admin_sales_units_by_product', { p_start_date: state.startDate, p_end_date: state.endDate }),
+        supabase.rpc('get_admin_sales_units_by_category', { p_start_date: state.startDate, p_end_date: state.endDate }),
       ]);
       if (version !== state.loadVersion) return;
       if (summaryResponse.error) throw summaryResponse.error;
       if (productsResponse.error) throw productsResponse.error;
+      if (categoriesResponse.error) throw categoriesResponse.error;
 
       const summary = Array.isArray(summaryResponse.data) ? summaryResponse.data[0] : summaryResponse.data;
       state.totalUnits = Number(summary?.total_units_sold || 0);
       state.products = productsResponse.data || [];
+      state.categories = categoriesResponse.data || [];
       state.status = 'ready';
       renderWorkspace();
     } catch (error) {
@@ -249,6 +286,7 @@ export async function createReportsPage() {
       } catch {
         // Show the request error if access cannot be rechecked because the network is unavailable.
       }
+      state.categories = [];
       state.products = [];
       state.totalUnits = null;
       state.status = 'error';
