@@ -1,4 +1,5 @@
 import { createAlert, getSession, subscribeToSessionChanges } from '../auth/auth-helpers.js';
+import { Modal } from 'bootstrap';
 import { getApprovedAdminProfile } from '../services/admin-access.js';
 import { isSupabaseConfigured, supabase } from '../services/supabase-client.js';
 
@@ -147,6 +148,32 @@ export async function createAdminCatalogManagement() {
           <p class="form-text mt-2 mb-0">За публикуване са нужни марка, категория, разфасовка и валидна крайна цена.</p><div class="d-grid gap-2 mt-4"><button class="btn btn-primary" type="submit">Запази промените</button><button class="btn btn-outline-primary" type="button" data-save-draft>Запази чернова</button><button class="btn btn-outline-success" type="button" data-publish-product>Публикувай</button><button class="btn btn-outline-danger" type="button" data-delete-product hidden>Изтрий продукта</button></div>
         </form></section>
       </div>`;
+
+    const deleteConfirmationModal = document.createElement('div');
+    deleteConfirmationModal.className = 'modal fade';
+    deleteConfirmationModal.id = 'delete-product-confirmation';
+    deleteConfirmationModal.tabIndex = -1;
+    deleteConfirmationModal.setAttribute('aria-labelledby', 'delete-product-confirmation-title');
+    deleteConfirmationModal.setAttribute('aria-describedby', 'delete-product-confirmation-description');
+    deleteConfirmationModal.setAttribute('aria-hidden', 'true');
+    deleteConfirmationModal.innerHTML = `
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title fs-5" id="delete-product-confirmation-title">Изтриване на продукт</h2>
+            <button class="btn-close" type="button" data-bs-dismiss="modal" data-delete-cancel aria-label="Затвори"></button>
+          </div>
+          <div class="modal-body" id="delete-product-confirmation-description">
+            <p class="mb-2">Наистина ли искате да изтриете <strong data-delete-product-name></strong>?</p>
+            <p class="mb-0 text-danger-emphasis">Изтриването е окончателно и не може да бъде отменено.</p>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal" data-delete-cancel>Отказ</button>
+            <button class="btn btn-danger" type="button" data-confirm-delete-product>Изтрий</button>
+          </div>
+        </div>
+      </div>`;
+    root.append(deleteConfirmationModal);
     return root;
   }
 
@@ -162,8 +189,28 @@ export async function createAdminCatalogManagement() {
     const formMessage = root.querySelector('[data-product-message]');
     const brandForm = root.querySelector('[data-brand-form]');
     const categoryForm = root.querySelector('[data-category-form]');
+    const deleteModalElement = root.querySelector('#delete-product-confirmation');
+    const deleteModal = Modal.getOrCreateInstance(deleteModalElement, { backdrop: 'static', focus: true, keyboard: false });
+    const deleteModalProductName = deleteModalElement.querySelector('[data-delete-product-name]');
+    const deleteModalCancelButtons = deleteModalElement.querySelectorAll('[data-delete-cancel]');
+    const cancelDeleteButton = deleteModalElement.querySelector('.modal-footer [data-delete-cancel]');
+    const confirmDeleteButton = deleteModalElement.querySelector('[data-confirm-delete-product]');
+    let productPendingDeletion = null;
     let productEditRevision = 0;
     let savedProductFormState = '';
+
+    function setDeleteConfirmationBusy(isBusy) {
+      confirmDeleteButton.disabled = isBusy;
+      deleteModalCancelButtons.forEach((button) => { button.disabled = isBusy; });
+      confirmDeleteButton.textContent = isBusy ? 'Изтриване…' : 'Изтрий';
+    }
+
+    deleteModalElement.addEventListener('shown.bs.modal', () => {
+      if (!state.deletingProductId) cancelDeleteButton.focus();
+    });
+    deleteModalElement.addEventListener('hidden.bs.modal', () => {
+      if (!state.deletingProductId) productPendingDeletion = null;
+    });
 
     const listSection = list.closest('section');
     const listPanel = list.parentElement;
@@ -764,32 +811,55 @@ export async function createAdminCatalogManagement() {
       renderList();
     }
 
-    async function deleteProduct() {
+    function openDeleteProductConfirmation() {
       const productId = productForm.elements.id.value;
       const product = state.products.find((item) => String(item.id) === String(productId));
+      if (!product || state.deletingProductId) return;
+
+      productPendingDeletion = { id: product.id, name: product.name };
+      deleteModalProductName.textContent = product.name;
+      setDeleteConfirmationBusy(false);
+      deleteModal.show();
+    }
+
+    function isStaleProductNameError(error) {
+      return (error?.message || '').includes('Product confirmation does not match');
+    }
+
+    async function refreshStaleProductForDeletion(product) {
+      try {
+        await refreshProductsAfterDeletion();
+        const refreshedProduct = state.products.find((item) => String(item.id) === String(product.id));
+        if (!refreshedProduct) {
+          resetProduct();
+          formMessage.replaceChildren(createAlert('warning', 'Продуктът вече не съществува. Каталогът е обновен.'));
+          return;
+        }
+
+        editProduct(refreshedProduct.id, true);
+        formMessage.replaceChildren(createAlert('warning', 'Името на продукта е променено. Данните са обновени; потвърдете изтриването отново.'));
+      } catch (_refreshError) {
+        formMessage.replaceChildren(createAlert('warning', 'Името на продукта е променено, но каталогът не можа да се обнови. Обновете страницата и потвърдете изтриването отново.'));
+      }
+    }
+
+    async function deleteProduct() {
+      const product = productPendingDeletion;
       const deleteButton = root.querySelector('[data-delete-product]');
       if (!product || state.deletingProductId) return;
 
-      const confirmation = window.prompt(
-        `Това ще изтрие окончателно продукта „${product.name}“. Въведете точно името му, за да потвърдите:`,
-        '',
-      );
-      if (confirmation === null) return;
-      if (confirmation !== product.name) {
-        formMessage.replaceChildren(createAlert('warning', 'Името не съвпада. Продуктът не е изтрит.'));
-        return;
-      }
-
       state.deletingProductId = String(product.id);
       setBusy(productForm, deleteButton, true, 'Изтриване…');
+      setDeleteConfirmationBusy(true);
       formMessage.replaceChildren(createAlert('info', 'Проверка на продукта и изтриване…'));
       try {
         const { error } = await supabase.rpc('delete_admin_product', {
           p_product_id: product.id,
-          p_confirmed_product_name: confirmation,
+          p_confirmed_product_name: product.name,
         });
         if (error) throw error;
 
+        deleteModal.hide();
         state.products = state.products.filter((item) => String(item.id) !== String(product.id));
         state.prices.delete(String(product.id));
         window.clearTimeout(state.autosaveTimer);
@@ -804,10 +874,17 @@ export async function createAdminCatalogManagement() {
           formMessage.replaceChildren(createAlert('warning', `Продуктът „${product.name}“ е изтрит окончателно. Редакторът е изчистен, но каталогът не можа да се обнови; обновете страницата.`));
         }
       } catch (error) {
-        formMessage.replaceChildren(createAlert('warning', deletionFailureMessage(error)));
+        deleteModal.hide();
+        if (isStaleProductNameError(error)) {
+          await refreshStaleProductForDeletion(product);
+        } else {
+          formMessage.replaceChildren(createAlert('warning', deletionFailureMessage(error)));
+        }
       } finally {
         state.deletingProductId = null;
+        productPendingDeletion = null;
         setBusy(productForm, deleteButton, false, 'Изтриване…');
+        setDeleteConfirmationBusy(false);
       }
     }
 
@@ -835,7 +912,8 @@ export async function createAdminCatalogManagement() {
     closeEditorButton.addEventListener('click', closeEditor);
     root.querySelector('[data-save-draft]').addEventListener('click', () => { queueNewDraftSave({ draftOnly: true }); });
     root.querySelector('[data-publish-product]').addEventListener('click', () => { queueNewDraftSave({ publish: true }); });
-    root.querySelector('[data-delete-product]').addEventListener('click', () => { void deleteProduct(); });
+    root.querySelector('[data-delete-product]').addEventListener('click', openDeleteProductConfirmation);
+    confirmDeleteButton.addEventListener('click', () => { void deleteProduct(); });
     productForm.addEventListener('submit', (event) => {
       event.preventDefault();
       queueNewDraftSave();

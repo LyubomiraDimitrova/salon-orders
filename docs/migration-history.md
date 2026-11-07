@@ -84,3 +84,17 @@ therefore renamed to
 `supabase/migrations/20261106144130_admin_sales_reporting.sql` to match the
 remote history. The SQL was not changed, and the remote migration was not
 reapplied.
+
+## 20261107073935 - Admin product deletion
+
+On 2026-11-07, this migration was manually applied through the reviewed
+Dashboard script
+`supabase/manual-apply-20261107073935_admin_delete_product.sql`. A read-only
+query confirmed the `schema_migrations` history row for version
+`20261107073935` and name `admin_delete_product`. The committed migration SQL
+was not changed or reapplied locally.
+
+The user reported testing the Bootstrap product-deletion confirmation modal
+and successfully deleting an unused test product. This is a user-reported UI
+test only; deferred rollback and security tests have not been recorded as
+passed.
