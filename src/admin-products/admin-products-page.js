@@ -2,6 +2,7 @@ import { createAlert, getSession, subscribeToSessionChanges } from '../auth/auth
 import { Modal } from 'bootstrap';
 import { getApprovedAdminProfile } from '../services/admin-access.js';
 import { isSupabaseConfigured, supabase } from '../services/supabase-client.js';
+import { createAdminPriceListsSection } from './price-lists-section.js';
 
 const productFields = 'id, brand_id, category_id, article_code, series_name, name, description, size_label, shade_number, shade_name, shade_color, developer_concentration, image_path, is_hidden, is_recommended, updated_at';
 const priceFormatter = new Intl.NumberFormat('bg-BG', { style: 'currency', currency: 'EUR' });
@@ -46,6 +47,7 @@ function byName(records) {
 export async function createAdminCatalogManagement() {
   const main = el('section', 'admin-products-page catalog-admin-management');
   const content = main;
+  let priceListsSection = null;
   const state = {
     autosaveTimer: null,
     categories: [],
@@ -78,6 +80,8 @@ export async function createAdminCatalogManagement() {
   }, true);
 
   function clearProtected(message, type = 'warning') {
+    priceListsSection?.clear();
+    priceListsSection = null;
     state.version += 1;
     state.draftContext += 1;
     window.clearTimeout(state.autosaveTimer);
@@ -178,6 +182,8 @@ export async function createAdminCatalogManagement() {
   }
 
   function renderWorkspace(initialMessage, initialType = 'success') {
+    priceListsSection?.clear();
+    priceListsSection = null;
     const root = shell();
     content.replaceChildren(root);
     const feedback = root.querySelector('.admin-products-feedback');
@@ -946,10 +952,15 @@ export async function createAdminCatalogManagement() {
     renderMeta();
     resetProduct();
     renderList();
+    priceListsSection = createAdminPriceListsSection();
+    root.append(priceListsSection.element);
+    void priceListsSection.load();
   }
 
   async function load(session) {
     const version = ++state.version;
+    priceListsSection?.clear();
+    priceListsSection = null;
     content.replaceChildren(createAlert('info', 'Проверка на администраторския достъп…'));
     try {
       const profile = await getApprovedAdminProfile(session.user.id);

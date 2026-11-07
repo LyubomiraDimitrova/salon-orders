@@ -86,8 +86,39 @@
 }
 
 .product-editor .btn,
-.catalog-meta-form .btn {
+.catalog-meta-form .btn,
+.admin-price-lists .btn {
   min-height: 2.9rem;
+}
+
+.admin-price-list-files {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.admin-price-list-file {
+  display: grid;
+  gap: 0.85rem;
+  background-color: var(--salon-soft-accent);
+  border: 1px solid var(--salon-border);
+  border-radius: 0.75rem;
+  padding: 0.85rem;
+}
+
+.admin-price-list-file h4,
+.admin-price-list-file p {
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 576px) {
+  .admin-price-list-file {
+    align-items: center;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .admin-price-list-file .btn {
+    min-width: 9.5rem;
+  }
 }
 
 @media (min-width: 576px) {
