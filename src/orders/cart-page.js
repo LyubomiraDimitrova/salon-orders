@@ -83,14 +83,76 @@ export function createCartPage() {
 
   let accountId = null;
   let form = null;
+  let formCard = null;
   let itemsContainer = null;
+  let recoveryContainer = null;
   let pageActive = true;
+
+  async function submitWebsiteOrder(submission, feedback, controls, submitButton) {
+    controls.forEach((control) => control.disabled = true);
+    submitButton.textContent = 'Изпращане…';
+
+    try {
+      const { data, error } = await supabase.rpc('submit_website_order', {
+        p_request_id: submission.requestId,
+        ...submission.payload,
+      });
+
+      if (error) throw error;
+      const order = Array.isArray(data) ? data[0] : data;
+      if (!order?.order_number) {
+        throw new Error('The server did not confirm an order number.');
+      }
+
+      clearClientOrderStorage(accountId);
+      content.replaceChildren(
+        createAlert('success', `Заявката е изпратена успешно. Номер на поръчката: № ${order.order_number}.`),
+        (() => {
+          const historyLink = createElement('a', 'btn btn-primary', 'Към моите поръчки');
+          historyLink.href = 'orders.html';
+          return historyLink;
+        })(),
+      );
+    } catch {
+      feedback.replaceChildren(createAlert(
+        'danger',
+        'Не получихме потвърждение за заявката. Данните и идентификаторът са запазени; опитайте отново със същата заявка.',
+      ));
+    } finally {
+      controls.forEach((control) => control.disabled = false);
+      submitButton.textContent = 'Изпрати заявката';
+    }
+  }
+
+  function renderRecoveryControls() {
+    if (!accountId || !recoveryContainer) return;
+    recoveryContainer.replaceChildren();
+    const pending = getPendingWebsiteSubmission(accountId);
+    if (!pending?.payload || getClientCart(accountId).length > 0) return;
+
+    const recovery = createElement('section', 'client-order-card p-3 p-md-4 mt-4');
+    const feedback = createElement('div', 'mb-3');
+    feedback.setAttribute('aria-live', 'polite');
+    feedback.append(createAlert(
+      'danger',
+      'Не получихме потвърждение за заявката. Данните и идентификаторът са запазени; опитайте отново със същата заявка.',
+    ));
+    const retry = createElement('button', 'btn btn-primary w-100', 'Изпрати заявката');
+    retry.type = 'button';
+    retry.addEventListener('click', () => {
+      void submitWebsiteOrder(pending, feedback, [retry], retry);
+    });
+    recovery.append(createElement('h2', 'h4 mb-3', 'Повторно изпращане'), feedback, retry);
+    recoveryContainer.append(recovery);
+  }
 
   function renderCart() {
     if (!accountId || !itemsContainer) return;
 
     const cart = getClientCart(accountId);
     itemsContainer.replaceChildren();
+    formCard.hidden = cart.length === 0;
+    form.querySelector('button[type="submit"]').disabled = cart.length === 0;
 
     if (cart.length === 0) {
       const empty = createElement('div', 'client-order-summary p-4');
@@ -98,7 +160,7 @@ export function createCartPage() {
       catalogLink.href = 'catalog.html';
       empty.append(createElement('p', 'mb-3', 'Кошницата е празна.'), catalogLink);
       itemsContainer.append(empty);
-      form.querySelector('button[type="submit"]').disabled = true;
+      renderRecoveryControls();
       return;
     }
 
@@ -124,11 +186,11 @@ export function createCartPage() {
       },
     )));
     itemsContainer.append(list);
-    form.querySelector('button[type="submit"]').disabled = false;
+    renderRecoveryControls();
   }
 
   function renderOrderForm() {
-    const card = createElement('section', 'client-order-card p-3 p-md-4');
+    formCard = createElement('section', 'client-order-card p-3 p-md-4');
     form = document.createElement('form');
     form.noValidate = true;
     const formStatus = createElement('div', 'mb-3');
@@ -196,43 +258,11 @@ export function createCartPage() {
       }
 
       const controls = form.querySelectorAll('input, textarea, button');
-      controls.forEach((control) => control.disabled = true);
-      submit.textContent = 'Изпращане…';
-
-      try {
-        const { data, error } = await supabase.rpc('submit_website_order', {
-          p_request_id: submission.requestId,
-          ...submission.payload,
-        });
-
-        if (error) throw error;
-        const order = Array.isArray(data) ? data[0] : data;
-        if (!order?.order_number) {
-          throw new Error('The server did not confirm an order number.');
-        }
-
-        clearClientOrderStorage(accountId);
-        content.replaceChildren(
-          createAlert('success', `Заявката е изпратена успешно. Номер на поръчката: № ${order.order_number}.`),
-          (() => {
-            const historyLink = createElement('a', 'btn btn-primary', 'Към моите поръчки');
-            historyLink.href = 'orders.html';
-            return historyLink;
-          })(),
-        );
-      } catch (error) {
-        formStatus.append(createAlert(
-          'danger',
-          'Не получихме потвърждение за заявката. Данните и идентификаторът са запазени; опитайте отново със същата заявка.',
-        ));
-      } finally {
-        controls.forEach((control) => control.disabled = false);
-        submit.textContent = 'Изпрати заявката';
-      }
+      await submitWebsiteOrder(submission, formStatus, controls, submit);
     });
 
-    card.append(createElement('h2', 'h4 mb-3', 'Данни за заявката'), form);
-    return card;
+    formCard.append(createElement('h2', 'h4 mb-3', 'Доставка и бележки'), form);
+    return formCard;
   }
 
   async function loadPage() {
@@ -257,7 +287,8 @@ export function createCartPage() {
 
       accountId = session.user.id;
       itemsContainer = createElement('section', 'mb-4');
-      content.replaceChildren(itemsContainer, renderOrderForm());
+      recoveryContainer = createElement('section');
+      content.replaceChildren(itemsContainer, renderOrderForm(), recoveryContainer);
       renderCart();
     } catch {
       content.replaceChildren(createAlert('danger', 'Кошницата не може да бъде заредена. Опитайте отново.'));
@@ -276,7 +307,14 @@ export function createCartPage() {
       content.replaceChildren(createPrivateAccessState('Влезте с одобрен клиентски профил, за да изпратите поръчка.'));
     }
   });
-  window.addEventListener('salon-auth-signed-out', () => unsubscribe(), { once: true });
+  const onCartUpdated = (event) => {
+    if (pageActive && event.detail?.accountId === accountId) renderCart();
+  };
+  window.addEventListener('salon-cart-updated', onCartUpdated);
+  window.addEventListener('salon-auth-signed-out', () => {
+    unsubscribe();
+    window.removeEventListener('salon-cart-updated', onCartUpdated);
+  }, { once: true });
   void loadPage();
   return main;
 }

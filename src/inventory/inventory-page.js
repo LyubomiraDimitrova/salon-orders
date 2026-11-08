@@ -1,4 +1,5 @@
 import { createAlert, getSession, subscribeToSessionChanges } from '../auth/auth-helpers.js';
+import { createConfirmationModal } from '../components/confirmation-modal.js';
 import { getApprovedAdminProfile } from '../services/admin-access.js';
 import { isSupabaseConfigured, supabase } from '../services/supabase-client.js';
 
@@ -69,12 +70,14 @@ export async function createInventoryPage() {
     </section></div>`;
 
   const content = main.querySelector('.inventory-content');
+  const confirmationModal = createConfirmationModal('inventory-confirmation');
   const state = {
     brands: [], categories: [], filters: { search: '', brand: '', category: '' }, movements: [],
     products: [], retryOperation: savedRetry(), selectedProductId: null, stockLevels: [], version: 0, busy: false,
   };
 
   function clearProtected(message, type = 'warning') {
+    confirmationModal.clear();
     state.version += 1;
     state.products = [];
     state.stockLevels = [];
@@ -310,11 +313,17 @@ export async function createInventoryPage() {
       description: 'Използвайте положително или отрицателно цяло число. Причината е задължителна.',
       buttonLabel: 'Коригирай наличността',
       quantity: createQuantityInput('adjustment-quantity', -999999, 1, 'Промяна (+/-)'),
-      onSubmit: (form, button) => {
+      onSubmit: async (form, button) => {
         const value = integerValue(form.elements['adjustment-quantity'].value, { minimum: -999999 });
         const reason = form.elements[`${button.textContent}-reason`]?.value.trim();
         if (value === null || value === 0 || !reason) { setMessage(feedback, 'danger', 'Въведете ненулево цяло количество и причина.'); return; }
-        if (value < 0 && !window.confirm(`Потвърждавате ли намаляване с ${Math.abs(value)}?`)) return;
+        if (value < 0 && !(await confirmationModal.confirm({
+          title: 'Потвърди намаляване на наличност',
+          description: `${product.name}: наличността ще бъде намалена с ${Math.abs(value)} бр.`,
+          confirmLabel: 'Намали наличността',
+          danger: true,
+          returnFocus: button,
+        }))) return;
         void executeOperation(operationFor('adjust_stock', { p_product_id: product.id, p_quantity_delta: value, p_reason: reason }, product.id, 'Корекцията'), feedback, button);
       },
     });

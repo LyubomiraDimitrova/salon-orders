@@ -1,4 +1,5 @@
 import { createAlert, getSession, subscribeToSessionChanges } from '../auth/auth-helpers.js';
+import { createConfirmationModal } from '../components/confirmation-modal.js';
 import { getApprovedAdminProfile } from '../services/admin-access.js';
 import { isSupabaseConfigured, supabase } from '../services/supabase-client.js';
 
@@ -44,6 +45,7 @@ export async function createAdminPage() {
 
   const content = main.querySelector('.admin-page-content');
   const headingActions = main.querySelector('[data-admin-heading-actions]');
+  const confirmationModal = createConfirmationModal('admin-salons-confirmation');
   const state = {
     activeAdminUserId: null,
     busy: false,
@@ -57,6 +59,7 @@ export async function createAdminPage() {
   };
 
   function clear(text, type = 'warning') {
+    confirmationModal.clear();
     state.version += 1;
     state.activeAdminUserId = null;
     state.busy = false;
@@ -87,18 +90,23 @@ export async function createAdminPage() {
     return salonFields.some(([name]) => String(values[name] || '') !== String(editing[name] || ''));
   }
 
-  function confirmDiscardForm() {
+  async function confirmDiscardForm() {
     const form = content.querySelector('[data-salon-form]');
     return !form
       || !formHasUnsavedChanges(form)
-      || window.confirm('Имате незапазени промени. Отказвате ли се от тях?');
+      || confirmationModal.confirm({
+        title: 'Незапазени промени',
+        description: 'Имате незапазени промени. Да бъдат ли отхвърлени?',
+        confirmLabel: 'Отхвърли',
+        danger: true,
+      });
   }
 
   function renderHeadingActions() {
     const addButton = el('button', 'btn btn-primary admin-add-salon-button', 'Добави салон');
     addButton.type = 'button';
-    addButton.addEventListener('click', () => {
-      if (state.busy || !confirmDiscardForm()) return;
+    addButton.addEventListener('click', async () => {
+      if (state.busy || !(await confirmDiscardForm())) return;
       state.creating = true;
       state.editingId = null;
       render();
@@ -139,8 +147,8 @@ export async function createAdminPage() {
     const cancel = el('button', 'btn btn-outline-secondary', 'Отказ');
     submit.type = 'submit';
     cancel.type = 'button';
-    cancel.addEventListener('click', () => {
-      if (state.busy || !confirmDiscardForm()) return;
+    cancel.addEventListener('click', async () => {
+      if (state.busy || !(await confirmDiscardForm())) return;
       state.creating = false;
       state.editingId = null;
       render();
@@ -214,8 +222,8 @@ export async function createAdminPage() {
     const list = el('div', 'admin-client-list');
     const formState = state.creating || state.editingId ? createSalonForm() : null;
 
-    function openEditForm(client) {
-      if (state.busy || !confirmDiscardForm()) return;
+    async function openEditForm(client) {
+      if (state.busy || !(await confirmDiscardForm())) return;
       state.creating = false;
       state.editingId = client.id;
       render();
@@ -273,7 +281,7 @@ export async function createAdminPage() {
         const actionsRow = el('div', 'admin-client-actions');
         const edit = el('button', 'btn btn-outline-primary', 'Редактирай');
         edit.type = 'button';
-        edit.addEventListener('click', () => openEditForm(client));
+        edit.addEventListener('click', () => void openEditForm(client));
         actionsRow.append(edit);
 
         if (profile) {

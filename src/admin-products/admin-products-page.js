@@ -1,5 +1,6 @@
 import { createAlert, getSession, subscribeToSessionChanges } from '../auth/auth-helpers.js';
 import { Modal } from 'bootstrap';
+import { createConfirmationModal } from '../components/confirmation-modal.js';
 import { getApprovedAdminProfile } from '../services/admin-access.js';
 import { isSupabaseConfigured, supabase } from '../services/supabase-client.js';
 import { getCategoryIllustration } from '../catalog/category-illustrations.js';
@@ -47,6 +48,7 @@ function byName(records) {
 export async function createAdminCatalogManagement() {
   const main = el('section', 'admin-products-page catalog-admin-management');
   const content = main;
+  const confirmationModal = createConfirmationModal('admin-products-confirmation');
   const state = {
     autosaveTimer: null,
     categories: [],
@@ -63,8 +65,13 @@ export async function createAdminCatalogManagement() {
     brands: [],
   };
 
-  function confirmDiscardProductChanges() {
-    return !state.productDirty || window.confirm('Имате незапазени промени по продукта. Да ги отхвърлите ли?');
+  async function confirmDiscardProductChanges() {
+    return !state.productDirty || confirmationModal.confirm({
+      title: 'Незапазени промени',
+      description: 'Имате незапазени промени по продукта. Да бъдат ли отхвърлени?',
+      confirmLabel: 'Отхвърли',
+      danger: true,
+    });
   }
 
   window.addEventListener('beforeunload', (event) => {
@@ -73,19 +80,22 @@ export async function createAdminCatalogManagement() {
     event.returnValue = '';
   });
 
-  document.addEventListener('click', (event) => {
+  document.addEventListener('click', async (event) => {
     const link = event.target.closest('a[href]');
     if (!link || !state.productDirty || link.target === '_blank') return;
-    if (!confirmDiscardProductChanges()) event.preventDefault();
+    event.preventDefault();
+    if (await confirmDiscardProductChanges()) window.location.assign(link.href);
   }, true);
 
   function clearProtected(message, type = 'warning') {
+    confirmationModal.clear();
     state.activeAdminUserId = null;
     state.version += 1;
     state.draftContext += 1;
     window.clearTimeout(state.autosaveTimer);
     state.autosaveTimer = null;
     state.isNewDraft = false;
+    state.productDirty = false;
     state.products = [];
     state.brands = [];
     state.categories = [];
@@ -273,8 +283,8 @@ export async function createAdminCatalogManagement() {
       productForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    function closeEditor() {
-      if (!confirmDiscardProductChanges()) return;
+    async function closeEditor() {
+      if (!(await confirmDiscardProductChanges())) return;
       state.draftContext += 1;
       window.clearTimeout(state.autosaveTimer);
       state.autosaveTimer = null;
@@ -361,8 +371,8 @@ export async function createAdminCatalogManagement() {
       markProductClean();
     }
 
-    function editProduct(id, allowDiscard = false) {
-      if (!allowDiscard && !confirmDiscardProductChanges()) return;
+    async function editProduct(id, allowDiscard = false) {
+      if (!allowDiscard && !(await confirmDiscardProductChanges())) return;
       state.draftContext += 1;
       window.clearTimeout(state.autosaveTimer);
       state.autosaveTimer = null;
@@ -432,7 +442,7 @@ export async function createAdminCatalogManagement() {
         illustration.height = 30;
         illustration.setAttribute('aria-hidden', 'true');
         button.type = 'button';
-        button.addEventListener('click', () => editProduct(product.id));
+        button.addEventListener('click', () => void editProduct(product.id));
         heading.append(illustration, el('h3', 'h6 mb-1', product.name));
         header.append(heading, button);
         card.append(header, el('p', 'small text-body-secondary mb-2', [brandNames.get(String(product.brand_id)), categoryNames.get(String(product.category_id)), product.size_label].filter(Boolean).join(' · ') || 'Непълна чернова'));
@@ -630,7 +640,7 @@ export async function createAdminCatalogManagement() {
         formMessage.replaceChildren(createAlert('success', hasPrice ? 'Продуктът и цената са запазени като скрита чернова.' : 'Продуктът е запазен като скрита чернова.'));
       }
       renderList();
-      editProduct(product.id, true);
+      await editProduct(product.id, true);
       setBusy(productForm, button, false, 'Запазване…');
     }
 
@@ -848,7 +858,7 @@ export async function createAdminCatalogManagement() {
           return;
         }
 
-        editProduct(refreshedProduct.id, true);
+        await editProduct(refreshedProduct.id, true);
         formMessage.replaceChildren(createAlert('warning', 'Името на продукта е променено. Данните са обновени; потвърдете изтриването отново.'));
       } catch (_refreshError) {
         formMessage.replaceChildren(createAlert('warning', 'Името на продукта е променено, но каталогът не можа да се обнови. Обновете страницата и потвърдете изтриването отново.'));
@@ -919,9 +929,9 @@ export async function createAdminCatalogManagement() {
       }, 700);
     }
 
-    root.querySelector('[data-new-product]').addEventListener('click', () => { if (confirmDiscardProductChanges()) { resetProduct(); showEditor(); } });
-    root.querySelector('[data-reset-product]').addEventListener('click', () => { if (confirmDiscardProductChanges()) resetProduct(); });
-    closeEditorButton.addEventListener('click', closeEditor);
+    root.querySelector('[data-new-product]').addEventListener('click', async () => { if (await confirmDiscardProductChanges()) { resetProduct(); showEditor(); } });
+    root.querySelector('[data-reset-product]').addEventListener('click', async () => { if (await confirmDiscardProductChanges()) resetProduct(); });
+    closeEditorButton.addEventListener('click', () => void closeEditor());
     root.querySelector('[data-save-draft]').addEventListener('click', () => { queueNewDraftSave({ draftOnly: true }); });
     root.querySelector('[data-publish-product]').addEventListener('click', () => { queueNewDraftSave({ publish: true }); });
     root.querySelector('[data-delete-product]').addEventListener('click', openDeleteProductConfirmation);

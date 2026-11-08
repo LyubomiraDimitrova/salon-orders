@@ -129,6 +129,39 @@ textarea {
   border: 1px solid var(--salon-border);
 }
 
+.public-home-card-link {
+  color: inherit;
+  display: block;
+  text-decoration: none;
+}
+
+.public-home-card-link:hover {
+  color: inherit;
+}
+
+.public-home-card-link:focus-visible {
+  box-shadow: 0 0 0 0.25rem var(--salon-focus-ring);
+  color: inherit;
+  outline: none;
+}
+
+.hero-card.public-home-card-link,
+.hero-card.public-home-card-link:visited,
+.hero-card.public-home-card-link:hover,
+.hero-card.public-home-card-link:focus-visible {
+  color: var(--salon-surface);
+}
+
+.client-home-navigation-grid {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: 1fr;
+}
+
+.client-home-navigation-grid > .public-home-card-link {
+  height: 100%;
+}
+
 .admin-home-actions {
   display: grid;
   gap: 0.75rem;
@@ -228,6 +261,10 @@ a:hover {
 
 @media (min-width: 576px) {
   .admin-home-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .client-home-navigation-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

@@ -1,11 +1,12 @@
-import { getSession, subscribeToSessionChanges } from '../auth/auth-helpers.js';
+import { getSession, loadOwnProfile, subscribeToSessionChanges } from '../auth/auth-helpers.js';
 import { getApprovedAdminProfile } from '../services/admin-access.js';
 import { isSupabaseConfigured } from '../services/supabase-client.js';
 
-function renderPublicHome(main) {
+function renderPublicHome(main, { pendingClient = false } = {}) {
   main.innerHTML = `
     <section class="hero-section py-5 py-lg-6">
       <div class="container py-lg-4">
+        ${pendingClient ? '<div class="alert alert-warning mb-4" role="status">Регистрацията ви чака одобрение. Може да актуализирате данните си от <a href="profile.html">профила</a>.</div>' : ''}
         <div class="row align-items-center g-5">
           <div class="col-lg-7">
             <p class="eyebrow mb-3">ЗА ВАШАТА КОСА</p>
@@ -16,11 +17,11 @@ function renderPublicHome(main) {
             <a class="btn btn-primary btn-lg px-4" href="catalog.html">Разгледайте колекцията</a>
           </div>
           <div class="col-lg-5">
-            <div class="hero-card p-4 p-md-5">
+            <a class="hero-card public-home-card-link p-4 p-md-5" href="catalog.html">
               <p class="eyebrow mb-3">SALON ORDERS</p>
               <p class="h3 fw-semibold mb-3">Красотата започва с добра грижа.</p>
-              <p class="mb-0 text-body-secondary">Скоро ще можете да разглеждате внимателно подбран каталог за вашия тип коса.</p>
-            </div>
+              <p class="mb-0 text-body-secondary">Разгледайте подбрани продукти за професионална грижа за косата.</p>
+            </a>
           </div>
         </div>
       </div>
@@ -30,23 +31,59 @@ function renderPublicHome(main) {
       <div class="container">
         <div class="row g-4">
           <div class="col-md-4">
-            <article class="feature-card h-100 p-4">
+            <a class="feature-card public-home-card-link h-100 p-4" href="catalog.html">
               <h2 class="h4">Подбран каталог</h2>
               <p class="mb-0 text-body-secondary">Продукти за грижа, стилизиране и вдъхновение.</p>
-            </article>
+            </a>
           </div>
           <div class="col-md-4">
-            <article class="feature-card h-100 p-4">
+            <a class="feature-card public-home-card-link h-100 p-4" href="catalog.html">
               <h2 class="h4">Лесен избор</h2>
               <p class="mb-0 text-body-secondary">Ясна информация, която помага да откриете подходящата грижа.</p>
-            </article>
+            </a>
           </div>
           <div class="col-md-4">
-            <article class="feature-card h-100 p-4">
+            <a class="feature-card public-home-card-link h-100 p-4" href="catalog.html">
               <h2 class="h4">Салонно отношение</h2>
               <p class="mb-0 text-body-secondary">Внимание към всеки детайл от избора до грижата у дома.</p>
-            </article>
+            </a>
           </div>
+        </div>
+      </div>
+    </section>`;
+}
+
+function renderApprovedClientHome(main) {
+  main.innerHTML = `
+    <section class="hero-section py-5 py-lg-6">
+      <div class="container py-lg-4">
+        <p class="eyebrow mb-3">ЗА ВАШАТА КОСА</p>
+        <h1 class="display-4 fw-bold mb-4">Професионална грижа, подбрана с внимание.</h1>
+        <p class="lead text-body-secondary mb-4">Открийте продукти за ежедневна грижа и салонни резултати — на едно спокойно и удобно място.</p>
+        <div class="client-home-navigation-grid">
+          <a class="feature-card public-home-card-link p-4" href="catalog.html">
+            <h2 class="h4">Каталог</h2>
+            <p class="mb-0 text-body-secondary">Разгледайте подбрани продукти за професионална грижа за косата.</p>
+          </a>
+          <a class="hero-card public-home-card-link p-4" href="orders.html">
+            <h2 class="h4">Моите поръчки</h2>
+            <p class="mb-0 text-body-secondary">Прегледайте направените от вас поръчки.</p>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="py-5 bg-white">
+      <div class="container">
+        <div class="client-home-navigation-grid">
+          <a class="feature-card public-home-card-link p-4" href="profile.html">
+            <h2 class="h4">Профил</h2>
+            <p class="mb-0 text-body-secondary">Прегледайте и редактирайте данните си.</p>
+          </a>
+          <a class="feature-card public-home-card-link p-4" href="cart.html">
+            <h2 class="h4">Кошница</h2>
+            <p class="mb-0 text-body-secondary">Прегледайте избраните продукти и изпратете поръчка.</p>
+          </a>
         </div>
       </div>
     </section>`;
@@ -139,6 +176,17 @@ export function createHomePage() {
         renderAdminHome(main);
         return;
       }
+      const { profile } = await loadOwnProfile(activeSession.user.id);
+      if (version !== accessCheckVersion) return;
+      if (profile?.role === 'client' && profile.approval_status === 'approved' && profile.salon_client_id) {
+        renderApprovedClientHome(main);
+        return;
+      }
+
+      renderPublicHome(main, {
+        pendingClient: profile?.role === 'client' && profile.approval_status === 'pending',
+      });
+      return;
     } catch {
       if (version !== accessCheckVersion) return;
     }

@@ -5,7 +5,6 @@ import {
   createStatusBadge,
   formatDate,
   formatDateTime,
-  formatTimeInterval,
 } from './order-page-utils.js';
 
 function createElement(tagName, className, text) {
@@ -80,7 +79,6 @@ function createOrderCard(order) {
   const delivery = createElement('section', 'mb-4');
   delivery.append(createElement('h3', 'h6', 'Заявена доставка'));
   appendSnapshotField(delivery, 'Дата', formatDate(order.requested_delivery_date));
-  appendSnapshotField(delivery, 'Часови интервал', formatTimeInterval(order.requested_delivery_time_from, order.requested_delivery_time_to));
   appendSnapshotField(delivery, 'Инструкции', order.delivery_instructions);
   appendSnapshotField(delivery, 'Бележка', order.customer_note);
 

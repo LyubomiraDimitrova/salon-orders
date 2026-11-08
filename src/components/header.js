@@ -29,6 +29,10 @@ function mountAccountNavigation(header, currentPage) {
     }
 
     const profileLink = createNavigationLink('Профил', 'profile.html', currentPage === 'profile');
+    const logoutFeedback = document.createElement('div');
+    logoutFeedback.className = 'alert alert-danger mb-2';
+    logoutFeedback.hidden = true;
+    logoutFeedback.setAttribute('role', 'alert');
     const logoutButton = document.createElement('button');
     logoutButton.className = 'nav-link auth-logout';
     logoutButton.type = 'button';
@@ -39,7 +43,8 @@ function mountAccountNavigation(header, currentPage) {
 
       if (error) {
         logoutButton.disabled = false;
-        window.alert('Изходът не може да бъде извършен. Опитайте отново.');
+        logoutFeedback.textContent = 'Изходът не може да бъде извършен. Опитайте отново.';
+        logoutFeedback.hidden = false;
         return;
       }
 
@@ -48,7 +53,7 @@ function mountAccountNavigation(header, currentPage) {
       window.location.assign('index.html');
     });
 
-    group.append(profileLink, logoutButton);
+    group.append(logoutFeedback, profileLink, logoutButton);
     navigation.replaceChildren(group);
 
     try {

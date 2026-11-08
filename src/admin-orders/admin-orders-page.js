@@ -1,4 +1,6 @@
 import { createAlert, getSession, subscribeToSessionChanges } from '../auth/auth-helpers.js';
+import { Modal } from 'bootstrap';
+import { createConfirmationModal } from '../components/confirmation-modal.js';
 import { getApprovedAdminProfile } from '../services/admin-access.js';
 import { isSupabaseConfigured, supabase } from '../services/supabase-client.js';
 
@@ -13,6 +15,9 @@ const sofiaDateTimeFormatter = new Intl.DateTimeFormat('en-CA', {
 });
 const sofiaDisplayFormatter = new Intl.DateTimeFormat('bg-BG', {
   timeZone: 'Europe/Sofia', dateStyle: 'medium', timeStyle: 'short',
+});
+const sofiaDateFormatter = new Intl.DateTimeFormat('bg-BG', {
+  timeZone: 'Europe/Sofia', dateStyle: 'medium',
 });
 
 function sofiaDateTimeValues(value) {
@@ -46,6 +51,10 @@ function sofiaDateTimeToIso(dateValue, timeValue) {
   return candidates[0]?.toISOString() || null;
 }
 
+function sofiaDeliveryDateToIso(dateValue) {
+  return sofiaDateTimeToIso(dateValue, '12:00:00');
+}
+
 function savedOperation(key) {
   try { return JSON.parse(sessionStorage.getItem('salon-orders:order-op:' + key)); } catch { return null; }
 }
@@ -54,6 +63,11 @@ function displaySofiaDateTime(value) {
   if (!value) return '—';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '—' : sofiaDisplayFormatter.format(date);
+}
+function displaySofiaDate(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '—' : sofiaDateFormatter.format(date);
 }
 function customerNotes(order) {
   return [
@@ -78,8 +92,10 @@ export async function createAdminOrdersPage() {
   const main = e('main', 'admin-orders-page py-4 py-md-5');
   main.innerHTML = '<div class="container"><section class="admin-orders-shell"><header class="admin-orders-heading"><div><p class="eyebrow mb-1">АДМИНИСТРАЦИЯ</p><h1 class="h2 mb-1">Поръчки</h1><p class="text-body-secondary mb-0">Обработка, резервиране и доставка.</p></div><span class="badge text-bg-danger new-count" data-new>0 нови</span></header><div class="admin-orders-content mt-4"></div></section></div>';
   const content = main.querySelector('.admin-orders-content');
-  const state = { orders: [], order: null, selectedOrderId: null, searchQuery: '', statusFilter: '', lines: [], summaryLines: [], reservations: [], stock: [], busy: false, version: 0, summaryVersion: 0, clients: null, products: null, prices: null, createBusy: false, quantityEditors: new Map() };
-  const clear = (message) => { state.version += 1; state.orders = []; state.order = null; state.quantityEditors.clear(); content.replaceChildren(createAlert('warning', message)); };
+  const confirmationModal = createConfirmationModal('admin-orders-confirmation');
+  const state = { orders: [], order: null, selectedOrderId: null, retainedOpenOrderId: null, searchQuery: '', statusFilter: '', lines: [], summaryLines: [], reservations: [], stock: [], busy: false, version: 0, summaryVersion: 0, clients: null, products: null, prices: null, createBusy: false, quantityEditors: new Map() };
+  let cleanupDenialModal = () => {};
+  const clear = (message) => { confirmationModal.clear(); cleanupDenialModal(); state.version += 1; state.orders = []; state.order = null; state.quantityEditors.clear(); content.replaceChildren(createAlert('warning', message)); };
   const rpc = async (name, payload, key) => { const op = requestId(key, payload); const { error } = await supabase.rpc(name, { p_request_id: op.id, ...op.payload }); if (error) throw error; sessionStorage.removeItem(op.k); };
   const message = (box, type, text) => box.replaceChildren(createAlert(type, text));
   const adminCreateKey = 'salon-orders:admin-create-order';
@@ -87,6 +103,39 @@ export async function createAdminOrdersPage() {
   const adminOrderOperation = () => { try { return JSON.parse(sessionStorage.getItem(adminCreateKey)); } catch { return null; } };
   const adminDeliveredOrderOperation = () => { try { return JSON.parse(sessionStorage.getItem(adminDeliveredCreateKey)); } catch { return null; } };
   const saveAdminDeliveredOrderOperation = (operation) => sessionStorage.setItem(adminDeliveredCreateKey, JSON.stringify(operation));
+  const denialModalElement = document.createElement('div');
+  denialModalElement.className = 'modal fade';
+  denialModalElement.tabIndex = -1;
+  denialModalElement.setAttribute('role', 'dialog');
+  denialModalElement.setAttribute('aria-modal', 'true');
+  denialModalElement.setAttribute('aria-labelledby', 'deny-order-modal-title');
+  denialModalElement.setAttribute('aria-describedby', 'deny-order-modal-description');
+  denialModalElement.innerHTML = '<div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form data-deny-order-form><div class="modal-header"><h2 class="modal-title fs-5" id="deny-order-modal-title">Откажи поръчката</h2></div><div class="modal-body"><p id="deny-order-modal-description">Посочете задължителна причина за отказ.</p><label class="form-label fw-semibold" for="deny-order-reason">Причина</label><textarea class="form-control" id="deny-order-reason" name="reason" rows="3" required maxlength="2000"></textarea><div class="mt-3" aria-live="polite" data-deny-order-feedback></div></div><div class="modal-footer"><button class="btn btn-outline-secondary" type="button" data-deny-order-back>Назад</button><button class="btn btn-danger" type="submit" data-deny-order-confirm>Откажи поръчката</button></div></form></div></div>';
+  document.body.append(denialModalElement);
+  const denialModal = Modal.getOrCreateInstance(denialModalElement, { backdrop: 'static', focus: true, keyboard: false });
+  const denialForm = denialModalElement.querySelector('[data-deny-order-form]');
+  const denialReason = denialForm.elements.reason;
+  const denialFeedback = denialModalElement.querySelector('[data-deny-order-feedback]');
+  const denialBack = denialModalElement.querySelector('[data-deny-order-back]');
+  const denialConfirm = denialModalElement.querySelector('[data-deny-order-confirm]');
+  const denialState = { active: true, cleanupRequested: false, pending: null, submitting: false };
+  const setDenialBusy = (busy) => { denialState.submitting = busy; denialReason.disabled = busy; denialBack.disabled = busy; denialConfirm.disabled = busy; denialConfirm.textContent = busy ? 'Отказване…' : (denialState.pending?.rpcConfirmed ? 'Обнови статуса' : 'Откажи поръчката'); };
+  const finalizeDenialModal = () => { denialModal.dispose(); denialModalElement.remove(); };
+  cleanupDenialModal = () => {
+    if (!denialState.active) return;
+    denialState.active = false; denialState.cleanupRequested = true; denialState.pending = null;
+    if (denialModalElement.classList.contains('show')) { denialModal.hide(); return; }
+    finalizeDenialModal();
+  };
+  const closeDenialModal = () => { if (!denialState.submitting) denialModal.hide(); };
+  denialBack.addEventListener('click', closeDenialModal);
+  denialModalElement.addEventListener('shown.bs.modal', () => { if (denialState.active && !denialState.submitting) denialReason.focus(); });
+  denialModalElement.addEventListener('hidden.bs.modal', () => {
+    if (denialState.cleanupRequested) { finalizeDenialModal(); return; }
+    const returnFocus = denialState.pending?.returnFocus;
+    denialState.pending = null; denialFeedback.replaceChildren(); denialForm.reset(); setDenialBusy(false);
+    if (returnFocus?.isConnected) returnFocus.focus();
+  });
   async function ensureNewOrderData() {
     if (state.clients && state.products && state.prices) return;
     const [clients, products, prices] = await Promise.all([
@@ -118,7 +167,7 @@ export async function createAdminOrdersPage() {
       .order('id');
     if (error || summaryVersion !== state.summaryVersion) return;
     state.summaryLines = data || [];
-    redraw?.();
+    if (!state.selectedOrderId) redraw?.();
   }
 
   function newOrderPanel() {
@@ -137,7 +186,7 @@ export async function createAdminOrdersPage() {
       body.append(createAlert('warning', 'Поръчката е създадена, но доставката ѝ не е потвърдена. Отворете я, за да довършите доставката със запазените дата, час и UUID.'));
       const openOrder = e('button', 'btn btn-outline-primary w-100 mt-3', 'Отвори създадената поръчка');
       openOrder.type = 'button';
-      openOrder.onclick = () => { state.selectedOrderId = deliveredRetry.orderId; void load(deliveredRetry.orderId); };
+      openOrder.onclick = () => { void toggleOrder(deliveredRetry.orderId); };
       body.append(openOrder);
       return panel;
     }
@@ -151,10 +200,8 @@ export async function createAdminOrdersPage() {
     const deliveredLabel = e('label', 'form-check-label fw-semibold', 'Създай като доставена'); deliveredLabel.htmlFor = deliveredToggle.id;
     const deliveredHelp = e('p', 'form-text mb-0', 'Изисква пълна резервация. Доставката ще приспадне наличността и ще влезе в отчетите за действителната дата. Ако продажбата вече е приспадната ръчно, първо я изравнете.');
     const actualDelivery = e('div', 'row g-2 mt-1'); actualDelivery.hidden = true;
-    const defaultActual = sofiaDateTimeValues(new Date());
-    const actualDate = e('input', 'form-control'); actualDate.type = 'date'; actualDate.name = 'actualDate'; actualDate.value = defaultActual.date;
-    const actualTime = e('input', 'form-control'); actualTime.type = 'time'; actualTime.name = 'actualTime'; actualTime.step = '1'; actualTime.value = defaultActual.time;
-    [['Реална дата на доставка', actualDate], ['Реален час на доставка', actualTime]].forEach(([label, input]) => { const field = e('div', 'col-12 col-sm-6'); field.append(e('label', 'form-label fw-semibold', label), input); actualDelivery.append(field); });
+    const actualDate = e('input', 'form-control'); actualDate.type = 'date'; actualDate.name = 'actualDate'; actualDate.value = sofiaDateTimeValues(new Date()).date;
+    const actualDateField = e('div', 'col-12'); actualDateField.append(e('label', 'form-label fw-semibold', 'Реална дата на доставка'), actualDate); actualDelivery.append(actualDateField);
     deliveredField.append(e('div', 'form-check', undefined), deliveredHelp, actualDelivery); deliveredField.firstElementChild.append(deliveredToggle, deliveredLabel);
     const requestedDate = e('input', 'form-control'); requestedDate.type = 'date'; requestedDate.name = 'requestedDate'; const confirmedDate = e('input', 'form-control'); confirmedDate.type = 'date'; confirmedDate.name = 'confirmedDate'; const dateFields = []; [['Заявена дата', requestedDate], ['Потвърдена дата', confirmedDate]].forEach(([label, input]) => { const field = e('div', 'col-12 col-sm-6'); field.append(e('label', 'form-label fw-semibold', label), input); dateFields.push(field); });
     const notes = e('textarea', 'form-control'); notes.name = 'notes'; notes.rows = 2; const notesField = e('div', 'col-12'); notesField.append(e('label', 'form-label fw-semibold', 'Бележки'), notes, e('p', 'form-text mb-0', 'Удобен час за доставка или други уточнения.'));
@@ -217,34 +264,92 @@ export async function createAdminOrdersPage() {
     };
     add.onclick = addRow; addRow(); linesBox.append(rows, add, e('p', 'form-text mb-0', 'Недостатъчната или неизвестна наличност не спира създаването.'));
     const submitField = e('div', 'col-12'); const submit = e('button', 'btn btn-primary w-100', retry ? 'Повтори новата поръчка' : 'Създай поръчка'); submit.type = 'submit'; submitField.append(submit);
-    const updateDeliveredFields = () => { const isDelivered = deliveredToggle.checked; actualDelivery.hidden = !isDelivered; actualDate.required = isDelivered; actualTime.required = isDelivered; status.disabled = isDelivered; if (isDelivered) status.value = 'IN_PROGRESS'; submit.textContent = retry ? 'Повтори новата поръчка' : (deliveredRetry ? 'Повтори създаването като доставена' : (isDelivered ? 'Създай като доставена' : 'Създай поръчка')); };
-    if (retry || deliveredRetry) { deliveredToggle.disabled = true; if (deliveredRetry) { deliveredToggle.checked = true; const savedValues = sofiaDateTimeValues(new Date(deliveredRetry.deliveredAt)); actualDate.value = savedValues.date; actualTime.value = savedValues.time; actualDate.disabled = true; actualTime.disabled = true; } }
+    const updateDeliveredFields = () => { const isDelivered = deliveredToggle.checked; actualDelivery.hidden = !isDelivered; actualDate.required = isDelivered; status.disabled = isDelivered; if (isDelivered) status.value = 'IN_PROGRESS'; submit.textContent = retry ? 'Повтори новата поръчка' : (deliveredRetry ? 'Повтори създаването като доставена' : (isDelivered ? 'Създай като доставена' : 'Създай поръчка')); };
+    if (retry || deliveredRetry) { deliveredToggle.disabled = true; if (deliveredRetry) { deliveredToggle.checked = true; actualDate.value = sofiaDateTimeValues(new Date(deliveredRetry.deliveredAt)).date; actualDate.disabled = true; } }
     deliveredToggle.onchange = updateDeliveredFields; updateDeliveredFields();
     form.append(linesBox, statusField, deliveredField, ...dateFields, notesField, submitField);
     form.onsubmit = async (event) => { event.preventDefault(); if (state.createBusy) return; const lineValues = [...rows.children].map((row) => ({ product_id: Number(row.querySelector('[data-product-id]').value), quantity: Number(row.querySelector('input[type="number"]').value) })); if (!client.value || !lineValues.length || lineValues.some((line) => !Number.isInteger(line.product_id) || !Number.isInteger(line.quantity) || line.quantity <= 0)) { message(feedback, 'danger', 'Изберете салон и поне един продукт с положително цяло количество.'); return; }
       if (deliveredRetry) { await createAndDeliverAdminOrder(deliveredRetry, feedback, submit); return; }
       const payload = { p_salon_client_id: Number(client.value), p_source: 'phone', p_initial_status: status.value, p_requested_delivery_date: requestedDate.value || null, p_requested_delivery_time_from: null, p_requested_delivery_time_to: null, p_confirmed_delivery_date: confirmedDate.value || null, p_confirmed_delivery_time_from: null, p_confirmed_delivery_time_to: null, p_delivery_instructions: null, p_customer_note: notes.value.trim() || null, p_lines: lineValues };
       if (deliveredToggle.checked) {
-        const deliveredAt = sofiaDateTimeToIso(actualDate.value, actualTime.value);
-        if (!deliveredAt) { message(feedback, 'danger', 'Въведеният час не е валиден за Европа/София. Изберете друга дата или час.'); return; }
+        const deliveredAt = sofiaDeliveryDateToIso(actualDate.value);
+        if (!deliveredAt) { message(feedback, 'danger', 'Въведената дата не е валидна за Европа/София. Изберете друга дата.'); return; }
         const operation = { create: { id: newUuid(), payload: { ...payload, p_initial_status: 'IN_PROGRESS' } }, deliveredAt, orderId: null, delivery: null };
         saveAdminDeliveredOrderOperation(operation);
         await createAndDeliverAdminOrder(operation, feedback, submit);
         return;
       }
-      const operation = retry || { id: newUuid(), payload }; retry = operation; state.createBusy = true; submit.disabled = true; message(feedback, 'info', 'Създаване на поръчката…'); try { sessionStorage.setItem(adminCreateKey, JSON.stringify(operation)); const { data, error } = await supabase.rpc('create_admin_order', { p_request_id: operation.id, ...operation.payload }); if (error) throw error; sessionStorage.removeItem(adminCreateKey); retry = null; state.selectedOrderId = (Array.isArray(data) ? data[0] : data).order_id; await refreshOrdersAndSelection(); message(feedback, 'success', 'Поръчката е създадена и е отворена с резервите и недостига си.'); } catch (error) { message(feedback, 'danger', `Резултатът не е потвърден: ${translated(error)} Повторете същата заявка.`); } finally { state.createBusy = false; if (submit.isConnected) submit.disabled = false; } };
+      const operation = retry || { id: newUuid(), payload }; retry = operation; state.createBusy = true; submit.disabled = true; message(feedback, 'info', 'Създаване на поръчката…'); try { sessionStorage.setItem(adminCreateKey, JSON.stringify(operation)); const { data, error } = await supabase.rpc('create_admin_order', { p_request_id: operation.id, ...operation.payload }); if (error) throw error; sessionStorage.removeItem(adminCreateKey); retry = null; state.selectedOrderId = (Array.isArray(data) ? data[0] : data).order_id; state.order = null; await refreshOrdersAndSelection(true); message(feedback, 'success', 'Поръчката е създадена и е отворена с резервите и недостига си.'); } catch (error) { message(feedback, 'danger', `Резултатът не е потвърден: ${translated(error)} Повторете същата заявка.`); } finally { state.createBusy = false; if (submit.isConnected) submit.disabled = false; } };
     body.append(form); return panel;
   }
 
   function renderList() {
-    content.innerHTML = '<div class="row g-4"><section class="col-12 col-xl-5"><div class="admin-order-panel"><label class="form-label fw-semibold">Търсене</label><input class="form-control" data-search type="search" placeholder="Номер, салон или контакт"><label class="form-label fw-semibold mt-3">Статус</label><select class="form-select" data-filter><option value="">Всички</option><option>NEW</option><option>APPROVED</option><option>IN_PROGRESS</option><option>DENIED</option><option>DONE</option></select><div class="admin-order-list mt-3" data-list></div></div></section><section class="col-12 col-xl-7"><div class="admin-order-panel" data-detail><p class="text-body-secondary mb-0">Изберете поръчка.</p></div></section></div>';
+    content.innerHTML = '<section class="admin-order-panel"><label class="form-label fw-semibold">Търсене</label><input class="form-control" data-search type="search" placeholder="Номер, салон или контакт"><label class="form-label fw-semibold mt-3">Статус</label><select class="form-select" data-filter><option value="">Всички</option><option>NEW</option><option>APPROVED</option><option>IN_PROGRESS</option><option>DENIED</option><option>DONE</option></select><div class="admin-order-list mt-3" data-list></div></section>';
     const list = content.querySelector('[data-list]'); const search = content.querySelector('[data-search]'); const filter = content.querySelector('[data-filter]');
     list.parentElement.insertBefore(newOrderPanel(), list);
     search.value = state.searchQuery; filter.value = state.statusFilter;
-    const draw = () => { list.replaceChildren(); const q = state.searchQuery.toLowerCase(); const rows = state.orders.filter((o) => (!state.statusFilter || o.status === state.statusFilter) && (!q || [o.order_number, o.salon_name_snapshot, o.contact_name_snapshot].join(' ').toLowerCase().includes(q))); if (!rows.length) list.append(createAlert('info', 'Няма поръчки по този филтър.')); rows.forEach((o) => { const b = e('button', 'admin-order-card text-start' + (state.selectedOrderId === o.id ? ' selected' : '')); b.type = 'button'; b.innerHTML = '<span class="badge text-bg-secondary">' + labels[o.status] + '</span><strong>№ ' + o.order_number + '</strong><span>' + blank(o.salon_name_snapshot || o.contact_name_snapshot) + '</span><small>' + blank(o.confirmed_delivery_date || o.requested_delivery_date) + '</small>'; const summary = productSummary(o.id); if (summary) b.append(e('small', 'admin-order-product-summary', summary)); b.onclick = () => load(o.id); list.append(b); }); };
-    search.oninput = () => { state.searchQuery = search.value; draw(); }; filter.onchange = () => { state.statusFilter = filter.value; draw(); }; draw(); void refreshListSummaries(); return draw;
+    const draw = () => {
+      list.replaceChildren();
+      const q = state.searchQuery.toLowerCase();
+      const matches = (o) => (!state.statusFilter || o.status === state.statusFilter) && (!q || [o.order_number, o.salon_name_snapshot, o.contact_name_snapshot].join(' ').toLowerCase().includes(q));
+      const rows = state.orders.filter(matches);
+      const openOrder = state.orders.find((o) => o.id === state.selectedOrderId);
+      const retained = openOrder && state.retainedOpenOrderId === openOrder.id && !matches(openOrder);
+      if (retained) rows.unshift(openOrder);
+      if (!rows.length) list.append(createAlert('info', 'Няма поръчки по този филтър.'));
+      rows.forEach((o) => {
+        const expanded = state.selectedOrderId === o.id;
+        const card = e('article', 'admin-order-card' + (expanded ? ' selected' : ''));
+        const summary = e('div', 'admin-order-summary');
+        const summaryInfo = e('div', 'admin-order-summary-info');
+        summaryInfo.innerHTML = '<span class="badge text-bg-secondary">' + labels[o.status] + '</span><strong>№ ' + o.order_number + '</strong><span>' + blank(o.salon_name_snapshot || o.contact_name_snapshot) + '</span><small>' + blank(o.confirmed_delivery_date || o.requested_delivery_date) + '</small>';
+        const products = productSummary(o.id); if (products) summaryInfo.append(e('small', 'admin-order-product-summary', products));
+        const toggle = e('button', 'admin-order-toggle');
+        const detailId = `admin-order-detail-${o.id}`;
+        const chevron = e('span', 'admin-order-toggle-chevron', '⌄');
+        chevron.setAttribute('aria-hidden', 'true');
+        toggle.type = 'button'; toggle.setAttribute('aria-expanded', String(expanded)); toggle.setAttribute('aria-controls', detailId); toggle.setAttribute('aria-label', expanded ? `Скрий детайлите за поръчка № ${o.order_number}` : `Покажи детайлите за поръчка № ${o.order_number}`); toggle.append(chevron);
+        toggle.onclick = () => { void toggleOrder(o.id); };
+        summary.append(summaryInfo); card.append(summary, toggle);
+        if (expanded) {
+          const detailBox = e('div', 'admin-order-inline-detail'); detailBox.id = detailId; detailBox.dataset.orderDetail = String(o.id);
+          if (retained) detailBox.append(createAlert('info', 'Поръчката вече не отговаря на активния филтър, но остава отворена, докато я затворите или смените филтъра.'));
+          if (state.order?.id === o.id) detail(detailBox); else detailBox.append(e('p', 'text-body-secondary mb-0', 'Зареждане на детайлите…'));
+          card.append(detailBox);
+        }
+        list.append(card);
+      });
+    };
+    search.oninput = () => { state.searchQuery = search.value; draw(); };
+    filter.onchange = async () => {
+      if (state.selectedOrderId && !(await confirmDiscardEdits())) { filter.value = state.statusFilter; return; }
+      await closeOpenOrder(true); state.statusFilter = filter.value; state.retainedOpenOrderId = null; draw();
+    };
+    draw(); void refreshListSummaries(); return draw;
   }
   let redraw;
+  const activeDetail = () => content.querySelector('[data-order-detail]');
+  const hasUnsavedOrderEdits = () => [...(activeDetail()?.querySelectorAll('input, textarea, select') || [])]
+    .some((control) => control.dataset.initialValue !== undefined && control.value !== control.dataset.initialValue);
+  const confirmDiscardEdits = async () => !hasUnsavedOrderEdits() || confirmationModal.confirm({ title: 'Незапазени промени', description: 'Имате незапазени промени. Да бъдат ли отхвърлени?', confirmLabel: 'Отхвърли', danger: true });
+  async function closeOpenOrder(skipConfirmation = false) {
+    if (!state.selectedOrderId || (!skipConfirmation && !(await confirmDiscardEdits()))) return false;
+    state.quantityEditors.delete(state.selectedOrderId);
+    state.selectedOrderId = null; state.retainedOpenOrderId = null; state.order = null; state.lines = []; state.reservations = []; state.stock = [];
+    return true;
+  }
+  async function toggleOrder(id) {
+    if (state.selectedOrderId === id) {
+      if (!(await closeOpenOrder())) return;
+      redraw?.();
+      return;
+    }
+    if (!(await confirmDiscardEdits())) return;
+    await closeOpenOrder(true);
+    state.selectedOrderId = id; state.order = null; state.lines = []; state.reservations = []; state.stock = [];
+    redraw?.();
+    await load(id);
+  }
   const activeQty = (line) => state.reservations.filter((r) => r.order_line_id === line.id && r.status === 'active').reduce((n, r) => n + r.quantity, 0);
   const pendingDeliveredOrderFor = (orderId) => {
     const operation = adminDeliveredOrderOperation();
@@ -260,7 +365,7 @@ export async function createAdminOrdersPage() {
     if (incomplete.length) return `Не са резервирани всички количества: ${incomplete.map((line) => `${line.product_name_snapshot} (${activeQty(line)} от ${line.quantity})`).join(', ')}. Резервирайте липсващите количества преди доставка.`;
     return null;
   };
-  const visibleFeedback = (fallback) => content.querySelector('[data-detail] [data-feedback]') || fallback;
+  const visibleFeedback = (fallback) => content.querySelector('[data-order-detail] [data-feedback]') || fallback;
   async function createAndDeliverAdminOrder(operation, fallbackFeedback, control) {
     if (state.createBusy) return;
     state.createBusy = true; control.disabled = true;
@@ -277,8 +382,8 @@ export async function createAdminOrdersPage() {
         operation.delivery = { id: newUuid(), payload: { p_order_id: operation.orderId, p_delivered_at: operation.deliveredAt } };
         saveAdminDeliveredOrderOperation(operation);
       }
-      state.selectedOrderId = operation.orderId;
-      await refreshOrdersAndSelection();
+      state.selectedOrderId = operation.orderId; state.order = null;
+      await refreshOrdersAndSelection(true);
       const feedback = visibleFeedback(fallbackFeedback);
       if (state.order?.id !== operation.orderId) {
         message(feedback, 'warning', 'Поръчката е създадена, но не може да се зареди за проверка. Не е изпратено отбелязване на доставка; отворете запазената поръчка и повторете действието.');
@@ -299,7 +404,7 @@ export async function createAdminOrdersPage() {
       const { error } = await supabase.rpc('deliver_order', { p_request_id: operation.delivery.id, ...operation.delivery.payload });
       if (error) throw error;
       sessionStorage.removeItem(adminDeliveredCreateKey);
-      await refreshOrdersAndSelection();
+      await refreshOrdersAndSelection(true);
       message(visibleFeedback(fallbackFeedback), 'success', 'Поръчката е създадена като доставена. Наличността е приспадната и продажбата е включена за действителната дата на доставка.');
     } catch (error) {
       message(visibleFeedback(fallbackFeedback), 'danger', `Поръчката може вече да е създадена, но доставката не е потвърдена: ${translated(error)} Отворете запазената поръчка и повторете същото действие.`);
@@ -308,8 +413,43 @@ export async function createAdminOrdersPage() {
       if (control.isConnected) control.disabled = false;
     }
   }
-  async function run(control, box, task) { if (state.busy) return; state.busy = true; control.disabled = true; message(box, 'info', 'Изпращане… При прекъсване повторете същото действие.'); try { await task(); message(box, 'success', 'Промяната е записана. Обновяване…'); await refreshOrdersAndSelection(); } catch (error) { message(box, 'danger', translated(error)); } finally { state.busy = false; control.disabled = false; } }
-  function button(label, style, box, task, disabled, confirmation) { const b = e('button', 'btn ' + style + ' w-100', label); b.type = 'button'; b.disabled = !!disabled; b.title = disabled ? 'Първо резервирайте всички количества.' : ''; b.onclick = () => run(b, box, async () => { if (!confirmation || window.confirm(confirmation)) await task(); }); return b; }
+  async function run(control, box, task) { if (state.busy) return; state.busy = true; control.disabled = true; message(box, 'info', 'Изпращане… При прекъсване повторете същото действие.'); try { await task(); message(box, 'success', 'Промяната е записана. Обновяване…'); await refreshOrdersAndSelection(true); } catch (error) { message(box, 'danger', translated(error)); } finally { state.busy = false; control.disabled = false; } }
+  function button(label, style, box, task, disabled) { const b = e('button', 'btn ' + style + ' w-100', label); b.type = 'button'; b.disabled = !!disabled; b.title = disabled ? 'Първо резервирайте всички количества.' : ''; b.onclick = () => run(b, box, task); return b; }
+
+  function openOrderDenial(order, fallbackFeedback) {
+    if (!denialState.active || denialState.submitting) return;
+    denialState.pending = { orderId: order.id, fallbackFeedback, rpcConfirmed: false, returnFocus: document.activeElement };
+    denialForm.reset(); denialFeedback.replaceChildren(); setDenialBusy(false); denialModal.show();
+  }
+  denialForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const pending = denialState.pending;
+    const reason = denialReason.value.trim();
+    if (!pending || denialState.submitting) return;
+    if (!pending.rpcConfirmed && !reason) {
+      message(denialFeedback, 'danger', 'Причината за отказ е задължителна.');
+      denialReason.focus();
+      return;
+    }
+    setDenialBusy(true);
+    try {
+      if (!pending.rpcConfirmed) {
+        await rpc('deny_order', { p_order_id: pending.orderId, p_denial_reason: reason }, 'deny:' + pending.orderId);
+        pending.rpcConfirmed = true;
+      }
+      await refreshDeniedOrder(pending.orderId);
+      if (denialState.active) denialModal.hide();
+      message(visibleFeedback(pending.fallbackFeedback), 'success', 'Поръчката е отказана и данните са обновени.');
+    } catch (error) {
+      if (pending.rpcConfirmed) {
+        message(denialFeedback, 'warning', 'Отказът е потвърден, но данните не могат да се обновят. Използвайте „Обнови статуса“.');
+      } else {
+        message(denialFeedback, 'danger', `Отказът не е потвърден: ${translated(error)} Повторете същото действие.`);
+      }
+    } finally {
+      if (denialState.active) setDenialBusy(false);
+    }
+  });
 
   async function prices(box, orderId) { const { data, error } = await supabase.rpc('get_admin_order_price_snapshots', { p_order_id: orderId }); if (error || state.order?.id !== orderId) { box.textContent = 'Цените не могат да се заредят.'; return; } const current = (data || []).filter((x) => x.is_current); const total = current.reduce((n, x) => n + Number(x.retail_price) * x.quantity, 0); box.innerHTML = '<ul class="list-unstyled mb-2">' + current.map((x) => '<li>' + x.product_name_snapshot + ' × ' + x.quantity + ': ' + euro.format(x.retail_price) + '</li>').join('') + '</ul><strong>Общо: ' + euro.format(total) + '</strong>'; }
   function quantityEditorForm(order, current, feedback) {
@@ -371,7 +511,7 @@ export async function createAdminOrdersPage() {
         const savedQuantities = quantityMap(payload.p_lines);
         editor.baseline = savedQuantities;
         editor.draft = Object.fromEntries(expectedIds.map((productId) => [productId, String(savedQuantities[productId])]));
-        await refreshOrdersAndSelection();
+        await refreshOrdersAndSelection(true);
         message(visibleFeedback(feedback), 'success', 'Количествата са запазени.');
       } catch (error) {
         savedRetry = savedOperation(key); retryQuantities = quantityMap(savedRetry?.payload?.p_lines); submit.textContent = 'Повтори запазването на количествата';
@@ -383,12 +523,12 @@ export async function createAdminOrdersPage() {
     };
     return form;
   }
-  function detail() {
-    const o = state.order; const detailBox = content.querySelector('[data-detail]'); const current = state.lines.filter((x) => x.is_current); const fullyReserved = current.every((x) => activeQty(x) === x.quantity);
-    detailBox.innerHTML = '<div class="d-flex justify-content-between mb-3"><div><p class="eyebrow mb-1">ПОРЪЧКА № ' + o.order_number + '</p><h2 class="h4 mb-0">' + labels[o.status] + '</h2></div><span class="badge text-bg-secondary">' + o.source + '</span></div><div data-feedback></div><div class="snapshot-grid"><div><b>Салон</b><br>' + blank(o.salon_name_snapshot) + '</div><div><b>Контакт</b><br>' + blank(o.contact_name_snapshot) + '<br>' + blank(o.phone_snapshot) + '<br>' + blank(o.email_snapshot) + '</div><div><b>Адрес</b><br>' + blank(o.address_snapshot) + '</div><div><b>Желан ден за доставка</b><br>' + (o.requested_delivery_date || 'Не е посочен') + '</div><div><b>Потвърден ден за доставка</b><br>' + (o.confirmed_delivery_date || 'Още не е потвърден') + '</div><div><b>Бележка за доставка от клиента</b><br>' + (o.delivery_instructions || 'Не е посочена') + '</div><div><b>Бележка към поръчката</b><br>' + blank(o.customer_note) + '</div></div><details class="mt-3"><summary>Дати и детайли за доставка</summary><form class="row g-2 pt-3" data-delivery>' + dateInputs(o) + '<div class="col-12"><label class="form-label">Инструкции</label><textarea class="form-control" name="instructions">' + (o.delivery_instructions || '') + '</textarea></div><div class="col-12"><label class="form-label">Бележка</label><textarea class="form-control" name="note">' + (o.customer_note || '') + '</textarea></div>' + (['APPROVED','IN_PROGRESS'].includes(o.status) ? '<div class="col-12"><button class="btn btn-outline-primary w-100">Запази детайлите</button></div>' : '') + '</form></details><h3 class="h5 mt-4">Редове и резервиране</h3><div data-lines></div><details class="mt-3"><summary>Исторически цени и общо</summary><div class="pt-3" data-prices>Зареждане…</div></details><div class="admin-order-actions mt-4" data-actions></div>';
+  function detail(detailBox) {
+    const o = state.order; const current = state.lines.filter((x) => x.is_current); const fullyReserved = current.every((x) => activeQty(x) === x.quantity);
+    detailBox.innerHTML = '<div class="d-flex justify-content-between mb-3"><div><p class="eyebrow mb-1">ПОРЪЧКА № ' + o.order_number + '</p><h2 class="h4 mb-0">' + labels[o.status] + '</h2></div><span class="badge text-bg-secondary">' + o.source + '</span></div><div data-feedback></div><div class="snapshot-grid"><div><b>Салон</b><br>' + blank(o.salon_name_snapshot) + '</div><div><b>Контакт</b><br>' + blank(o.contact_name_snapshot) + '<br>' + blank(o.phone_snapshot) + '<br>' + blank(o.email_snapshot) + '</div><div><b>Адрес</b><br>' + blank(o.address_snapshot) + '</div><div><b>Желан ден за доставка</b><br>' + (o.requested_delivery_date || 'Не е посочен') + '</div><div><b>Потвърден ден за доставка</b><br>' + (o.confirmed_delivery_date || 'Още не е потвърден') + '</div><div><b>Бележка за доставка от клиента</b><br>' + (o.delivery_instructions || 'Не е посочена') + '</div><div><b>Бележка към поръчката</b><br>' + blank(o.customer_note) + '</div></div>' + (['APPROVED','IN_PROGRESS'].includes(o.status) ? '<form class="row g-2 mt-3" data-delivery>' + dateInputs(o) + '<div class="col-12"><button class="btn btn-outline-primary w-100">Запази датите</button></div></form>' : '') + '<h3 class="h5 mt-4">Редове и резервиране</h3><div data-lines></div><details class="mt-3"><summary>Исторически цени и общо</summary><div class="pt-3" data-prices>Зареждане…</div></details><div class="admin-order-actions mt-4" data-actions></div>';
     if (o.status === 'DONE') {
       const actual = e('div');
-      actual.append(e('b', '', 'Реална дата и час на доставка'), document.createElement('br'), document.createTextNode(displaySofiaDateTime(o.delivered_at)));
+      actual.append(e('b', '', 'Реална дата на доставка'), document.createElement('br'), document.createTextNode(displaySofiaDate(o.delivered_at)));
       detailBox.querySelector('.snapshot-grid').append(actual);
     }
     [...detailBox.querySelectorAll('.snapshot-grid > div')].filter((item) => item.textContent.startsWith('Бележка за доставка') || item.textContent.startsWith('Бележка към')).forEach((item) => item.remove());
@@ -404,9 +544,6 @@ export async function createAdminOrdersPage() {
       });
       detailBox.querySelector('.snapshot-grid').after(noteSection);
     }
-    const protectedForm = detailBox.querySelector('[data-delivery]');
-    protectedForm.querySelector('[name="instructions"]').closest('.col-12').remove();
-    protectedForm.querySelector('[name="note"]').closest('.col-12').remove();
     const feedback = detailBox.querySelector('[data-feedback]');
     if (state.statusFilter && state.statusFilter !== o.status) {
       message(feedback, 'info', 'Поръчката вече не отговаря на активния филтър и е премахната от списъка, но детайлите остават отворени.');
@@ -439,11 +576,12 @@ export async function createAdminOrdersPage() {
     });
     if (o.status === 'APPROVED') lines.append(quantityEditorForm(o, current, feedback));
     const actions = detailBox.querySelector('[data-actions]');
-    if (o.status === 'NEW') { const f = e('form', ''); f.innerHTML = '<label class="form-label fw-semibold">Потвърдена дата</label><input class="form-control mb-2" name="date" type="date" required><div class="row g-2"><div class="col"><input class="form-control" name="from" type="time"></div><div class="col"><input class="form-control" name="to" type="time"></div></div><button class="btn btn-primary w-100 mt-2">Одобри и резервирай</button>'; f.onsubmit = (ev) => { ev.preventDefault(); run(f.querySelector('button'), feedback, () => rpc('approve_order', { p_order_id:o.id, p_confirmed_delivery_date:f.date.value, p_confirmed_delivery_time_from:f.from.value || null, p_confirmed_delivery_time_to:f.to.value || null, p_delivery_instructions:null }, 'approve:' + o.id)); }; actions.append(f); }
+    if (o.status === 'NEW') { const f = e('form', ''); f.innerHTML = '<label class="form-label fw-semibold">Потвърди дата</label><input class="form-control mb-2" name="date" type="date" required><button class="btn btn-primary w-100 mt-2">Одобри и резервирай</button>'; f.onsubmit = (ev) => { ev.preventDefault(); run(f.querySelector('button'), feedback, () => rpc('approve_order', { p_order_id:o.id, p_confirmed_delivery_date:f.date.value, p_confirmed_delivery_time_from:o.confirmed_delivery_time_from, p_confirmed_delivery_time_to:o.confirmed_delivery_time_to, p_delivery_instructions:null }, 'approve:' + o.id)); }; actions.append(f); }
     if (o.status === 'APPROVED') actions.append(button('Започни обработка', 'btn-outline-primary', feedback, () => rpc('start_order_delivery', { p_order_id:o.id }, 'start:' + o.id)));
     if (o.status === 'IN_PROGRESS') actions.append(deliveryCompletionForm(o, feedback, fullyReserved));
-    if (['NEW','APPROVED','IN_PROGRESS'].includes(o.status)) actions.append(button('Откажи поръчката', 'btn-outline-danger', feedback, async () => { const reason = window.prompt('Посочете задължителна причина за отказ:'); if (!reason?.trim()) throw new Error('Причината за отказ е задължителна.'); await rpc('deny_order', { p_order_id:o.id, p_denial_reason:reason }, 'deny:' + o.id); }, false, 'Потвърждавате ли отказа?'));
-    const delivery = detailBox.querySelector('[data-delivery]'); if (delivery) delivery.onsubmit = (ev) => { ev.preventDefault(); run(delivery.querySelector('button'), feedback, () => rpc('update_order_delivery_details', { p_order_id:o.id, p_requested_delivery_date:delivery.requestedDate.value || null, p_requested_delivery_time_from:delivery.requestedFrom.value || null, p_requested_delivery_time_to:delivery.requestedTo.value || null, p_confirmed_delivery_date:delivery.confirmedDate.value || null, p_confirmed_delivery_time_from:delivery.confirmedFrom.value || null, p_confirmed_delivery_time_to:delivery.confirmedTo.value || null, p_delivery_instructions:o.delivery_instructions, p_customer_note:o.customer_note }, 'details:' + o.id)); };
+    if (['NEW','APPROVED','IN_PROGRESS'].includes(o.status)) { const deny = e('button', 'btn btn-outline-danger w-100', 'Откажи поръчката'); deny.type = 'button'; deny.onclick = () => openOrderDenial(o, feedback); actions.append(deny); }
+    const delivery = detailBox.querySelector('[data-delivery]'); if (delivery) delivery.onsubmit = (ev) => { ev.preventDefault(); run(delivery.querySelector('button'), feedback, () => rpc('update_order_delivery_details', { p_order_id:o.id, p_requested_delivery_date:delivery.requestedDate.value || null, p_requested_delivery_time_from:o.requested_delivery_time_from, p_requested_delivery_time_to:o.requested_delivery_time_to, p_confirmed_delivery_date:delivery.confirmedDate.value || null, p_confirmed_delivery_time_from:o.confirmed_delivery_time_from, p_confirmed_delivery_time_to:o.confirmed_delivery_time_to, p_delivery_instructions:o.delivery_instructions, p_customer_note:o.customer_note }, 'details:' + o.id)); };
+    detailBox.querySelectorAll('input, textarea, select').forEach((control) => { control.dataset.initialValue = control.value; });
     prices(detailBox.querySelector('[data-prices]'), o.id);
   }
   function deliveryCompletionForm(order, feedback, fullyReserved) {
@@ -451,39 +589,69 @@ export async function createAdminOrdersPage() {
     const savedCreatedDelivery = pendingDeliveredOrderFor(order.id);
     const saved = savedCreatedDelivery?.delivery || savedOperation(key);
     const savedTimestamp = saved?.payload?.p_order_id === order.id && saved?.payload?.p_delivered_at;
-    const values = sofiaDateTimeValues(savedTimestamp ? new Date(saved.payload.p_delivered_at) : new Date());
+    const deliveryDate = sofiaDateTimeValues(savedTimestamp ? new Date(saved.payload.p_delivered_at) : new Date()).date;
     const form = e('form', 'delivery-completion-form');
     form.noValidate = true;
-    form.append(e('h3', 'h5 mb-1', 'Реална дата и час на доставка'));
-    form.append(e('p', 'text-body-secondary small mb-3', 'Часът се тълкува в часовата зона Европа/София. Доставката ще приспадне резервираната наличност. Ако същата продажба вече е приспадната ръчно, първо я изравнете.'));
-    if (savedTimestamp) form.append(createAlert('warning', savedCreatedDelivery ? 'Поръчката е създадена, но доставката не е потвърдена. Повторението ще използва същите дата, час и UUID.' : 'Има непотвърдена заявка за доставка. Повторението ще използва същите дата, час и UUID.'));
+    form.append(e('h3', 'h5 mb-1', 'Реална дата на доставка'));
+    form.append(e('p', 'text-body-secondary small mb-3', 'За техническо отчитане датата се записва с 12:00 в Европа/София; това не е заявен действителен час. Доставката ще приспадне резервираната наличност.'));
+    if (savedTimestamp) form.append(createAlert('warning', savedCreatedDelivery ? 'Поръчката е създадена, но доставката не е потвърдена. Повторението ще използва същия запазен timestamp и UUID.' : 'Има непотвърдена заявка за доставка. Повторението ще използва същия запазен timestamp и UUID.'));
     if (!fullyReserved) form.append(createAlert('warning', 'Първо резервирайте всички количества, за да отбележите доставка.'));
     const row = e('div', 'row g-2');
-    [['date', 'Дата', values.date], ['time', 'Час', values.time]].forEach(([name, label, value]) => {
-      const field = e('div', 'col-12 col-sm-6'); const input = e('input', 'form-control');
-      input.type = name; input.name = name; input.value = value; input.required = true; input.disabled = !!savedTimestamp; if (name === 'time') input.step = '1';
-      const inputLabel = e('label', 'form-label fw-semibold', label); inputLabel.htmlFor = `actual-delivery-${name}-${order.id}`; input.id = inputLabel.htmlFor;
-      field.append(inputLabel, input); row.append(field);
-    });
+    const actualDateField = e('div', 'col-12'); const actualDate = e('input', 'form-control');
+    actualDate.type = 'date'; actualDate.name = 'date'; actualDate.value = deliveryDate; actualDate.required = true; actualDate.disabled = !!savedTimestamp;
+    const actualDateLabel = e('label', 'form-label fw-semibold', 'Реална дата на доставка'); actualDateLabel.htmlFor = `actual-delivery-date-${order.id}`; actualDate.id = actualDateLabel.htmlFor;
+    actualDateField.append(actualDateLabel, actualDate); row.append(actualDateField);
     const submit = e('button', 'btn btn-success w-100 mt-3', savedTimestamp ? (savedCreatedDelivery ? 'Повтори доставката на създадената поръчка' : 'Повтори отбелязването на доставка') : 'Отбележи като доставена');
     submit.type = 'submit'; submit.disabled = !fullyReserved; submit.title = !fullyReserved ? 'Първо резервирайте всички количества.' : '';
     form.append(row, submit);
-    form.onsubmit = (event) => {
+    form.onsubmit = async (event) => {
       event.preventDefault();
-      const p_delivered_at = savedTimestamp || sofiaDateTimeToIso(form.elements.date.value, form.elements.time.value);
+      const p_delivered_at = savedTimestamp || sofiaDeliveryDateToIso(form.elements.date.value);
       if (!p_delivered_at) {
-        message(feedback, 'danger', 'Въведеният час не е валиден за Европа/София. Изберете друга дата или час.');
+        message(feedback, 'danger', 'Въведената дата не е валидна за Европа/София. Изберете друга дата.');
         return;
       }
-      if (!window.confirm('Потвърждавате ли доставката? Тя ще приспадне резервираната наличност. Ако тази продажба вече е приспадната ръчно, първо я изравнете.')) return;
+      const deliveryDateLabel = displaySofiaDate(p_delivered_at);
+      const confirmed = await confirmationModal.confirm({ title: 'Потвърди доставка', description: `Поръчка № ${order.order_number}: доставка на ${deliveryDateLabel}. Резервираната наличност ще бъде приспадната.`, confirmLabel: 'Потвърди доставка', danger: true, returnFocus: submit });
+      if (!confirmed) return;
       if (savedCreatedDelivery) { void createAndDeliverAdminOrder(savedCreatedDelivery, feedback, submit); return; }
       run(submit, feedback, () => rpc('deliver_order', { p_order_id: order.id, p_delivered_at }, key));
     };
     return form;
   }
-  function dateInputs(o) { return [['requestedDate','Заявена дата',o.requested_delivery_date,'date'],['requestedFrom','Заявено от',o.requested_delivery_time_from,'time'],['requestedTo','Заявено до',o.requested_delivery_time_to,'time'],['confirmedDate','Потвърдена дата',o.confirmed_delivery_date,'date'],['confirmedFrom','Потвърдено от',o.confirmed_delivery_time_from,'time'],['confirmedTo','Потвърдено до',o.confirmed_delivery_time_to,'time']].map((x) => '<div class="col-6"><label class="form-label">' + x[1] + '</label><input class="form-control" name="' + x[0] + '" type="' + x[3] + '" value="' + (x[2] || '') + '"></div>').join(''); }
-  async function load(id) { state.selectedOrderId = id; const v = ++state.version; const { data:o, error } = await supabase.from('orders').select(orderFields).eq('id',id).single(); if (v !== state.version) return; if (error) { const feedback = content.querySelector('[data-feedback]'); if (feedback) message(feedback, 'danger', 'Детайлите не могат да бъдат обновени. Последно заредените данни остават видими.'); return; } const {data:lines} = await supabase.from('order_lines').select('id, order_id, product_id, product_name_snapshot, product_size_snapshot, quantity, is_current').eq('order_id',id); const ids=(lines || []).map((x)=>x.id); const [{data:reservations},{data:stock}] = await Promise.all([ids.length ? supabase.from('stock_reservations').select('order_line_id, quantity, status').in('order_line_id',ids) : Promise.resolve({data:[]}),supabase.from('stock_levels').select('product_id, physical_quantity, reserved_quantity')]); if(v!==state.version)return; state.order=o;state.lines=lines||[];state.reservations=reservations||[];state.stock=stock||[]; detail(); redraw?.(); }
-  async function refreshOrdersAndSelection() { const v = ++state.version; const {data,error}=await supabase.from('orders').select(orderFields).order('created_at',{ascending:false}); if (error || v !== state.version) return; state.orders=data||[];main.querySelector('[data-new]').textContent=state.orders.filter((x)=>x.status==='NEW').length+' нови';redraw?.(); void refreshListSummaries(); if(state.selectedOrderId) await load(state.selectedOrderId); }
+  function dateInputs(o) { return [['requestedDate','Заявена дата',o.requested_delivery_date],['confirmedDate','Потвърдена дата',o.confirmed_delivery_date]].map((x) => '<div class="col-12 col-sm-6"><label class="form-label">' + x[1] + '</label><input class="form-control" name="' + x[0] + '" type="date" value="' + (x[2] || '') + '"></div>').join(''); }
+  async function load(id) { state.selectedOrderId = id; const v = ++state.version; const { data:o, error } = await supabase.from('orders').select(orderFields).eq('id',id).single(); if (v !== state.version) return; if (error) { const feedback = activeDetail()?.querySelector('[data-feedback]'); if (feedback) message(feedback, 'danger', 'Детайлите не могат да бъдат обновени. Последно заредените данни остават видими.'); return; } const {data:lines} = await supabase.from('order_lines').select('id, order_id, product_id, product_name_snapshot, product_size_snapshot, quantity, is_current').eq('order_id',id); const ids=(lines || []).map((x)=>x.id); const [{data:reservations},{data:stock}] = await Promise.all([ids.length ? supabase.from('stock_reservations').select('order_line_id, quantity, status').in('order_line_id',ids) : Promise.resolve({data:[]}),supabase.from('stock_levels').select('product_id, physical_quantity, reserved_quantity')]); if(v!==state.version)return; state.order=o;state.lines=lines||[];state.reservations=reservations||[];state.stock=stock||[];redraw?.(); }
+  async function refreshDeniedOrder(orderId) {
+    const { data: deniedOrder, error } = await supabase.from('orders').select(orderFields).eq('id', orderId).single();
+    if (error || deniedOrder?.status !== 'DENIED') throw error || new Error('Отказът все още не е потвърден от сървъра.');
+    await refreshOrdersAndSelection(true);
+    if (state.order?.id !== orderId || state.order.status !== 'DENIED') {
+      state.orders = state.orders.map((order) => order.id === orderId ? deniedOrder : order);
+      await load(orderId);
+    }
+    if (state.order?.status !== 'DENIED') throw new Error('Отказът е записан, но данните не могат да се обновят.');
+  }
+  async function refreshOrdersAndSelection(reloadOpen = false) {
+    const v = ++state.version;
+    const { data, error } = await supabase.from('orders').select(orderFields).order('created_at', { ascending: false });
+    if (error || v !== state.version) return;
+    state.orders = data || [];
+    main.querySelector('[data-new]').textContent = state.orders.filter((x) => x.status === 'NEW').length + ' нови';
+    const open = state.orders.find((order) => order.id === state.selectedOrderId);
+    if (open && state.statusFilter && open.status !== state.statusFilter) state.retainedOpenOrderId = open.id;
+    else state.retainedOpenOrderId = null;
+    if (!state.selectedOrderId) redraw?.();
+    else if (reloadOpen) { state.order = null; redraw?.(); await load(state.selectedOrderId); }
+    else if (state.retainedOpenOrderId) {
+      const detailBox = activeDetail();
+      if (detailBox && !detailBox.querySelector('[data-filter-retained]')) {
+        const notice = createAlert('info', 'Поръчката вече не отговаря на активния филтър, но остава отворена, докато я затворите или смените филтъра.');
+        notice.dataset.filterRetained = 'true';
+        detailBox.prepend(notice);
+      }
+    }
+    void refreshListSummaries();
+  }
   async function refresh(session) { if(!isSupabaseConfigured){clear('Нужна е Supabase конфигурация.');return;} if(!session?.user){clear('Влезте с одобрен администраторски профил.');return;} try { if(!await getApprovedAdminProfile(session.user.id)){clear('Тази страница е само за одобрени администратори.');return;} if (!redraw) { const {data,error}=await supabase.from('orders').select(orderFields).order('created_at',{ascending:false}); if(error)throw error;state.orders=data||[];main.querySelector('[data-new]').textContent=state.orders.filter((x)=>x.status==='NEW').length+' нови';redraw=renderList(); } else { await refreshOrdersAndSelection(); } } catch { if (!redraw) clear('Поръчките не могат да бъдат заредени.'); } }
   const initial=await getSession();await refresh(initial.session);const unsubscribe=subscribeToSessionChanges((_event,session)=>{if(!session?.user)clear('Сесията е прекратена.');else void refresh(session);});window.addEventListener('salon-auth-signed-out',()=>{unsubscribe();clear('Сесията е прекратена.');},{once:true});window.addEventListener('focus',()=>void getSession().then((x)=>refresh(x.session)));return main;
 }

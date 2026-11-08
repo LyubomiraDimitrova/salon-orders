@@ -8,6 +8,7 @@ import {
   updateOwnSalonContact,
 } from './auth-helpers.js';
 import { createAuthPageLayout, createFormField } from './auth-page-layout.js';
+import { createConfirmationModal } from '../components/confirmation-modal.js';
 import { createAdminPriceListsSection } from '../admin-products/price-lists-section.js';
 import { isSupabaseConfigured } from '../services/supabase-client.js';
 
@@ -261,8 +262,8 @@ function createAdminContactEditForm(salonClient, draft, handlers) {
     return Object.entries(adminContactValues(salonClient)).some(([key, value]) => current[key] !== value);
   };
   [contactName.input, phone.input, email.input, address].forEach((input) => input.addEventListener('input', () => handlers.onDraft(readValues())));
-  cancel.addEventListener('click', () => {
-    if (isDirty() && !window.confirm('Имате незапазени промени. Отказвате ли ги?')) return;
+  cancel.addEventListener('click', async () => {
+    if (isDirty() && !(await handlers.confirmDiscard())) return;
     handlers.onCancel();
   });
   form.addEventListener('submit', (event) => {
@@ -295,9 +296,16 @@ export async function createProfilePage() {
   }
 
   const state = { accountId: null, adminDraft: null, editingAdmin: false, profile: null, salonClient: null, savingAdmin: false, version: 0 };
+  let confirmationModal = null;
+  const getConfirmationModal = () => {
+    confirmationModal ||= createConfirmationModal('profile-confirmation');
+    return confirmationModal;
+  };
   let priceListsSection = null;
   const isApprovedAdmin = (profile) => profile?.role === 'admin' && profile.approval_status === 'approved';
   const clearProtectedState = () => {
+    confirmationModal?.clear();
+    confirmationModal = null;
     priceListsSection?.clear();
     priceListsSection = null;
     state.accountId = null;
@@ -334,6 +342,12 @@ export async function createProfilePage() {
     } else {
       const form = createAdminContactEditForm(state.salonClient, state.adminDraft, {
         onDraft: (draft) => { state.adminDraft = draft; },
+        confirmDiscard: () => getConfirmationModal().confirm({
+          title: 'Незапазени промени',
+          description: 'Имате незапазени промени. Да бъдат ли отхвърлени?',
+          confirmLabel: 'Отхвърли',
+          danger: true,
+        }),
         onCancel: () => { state.editingAdmin = false; state.adminDraft = null; renderAdminProfile(userEmail); },
         onSave: async (draft, controls) => {
           if (state.savingAdmin) return;
